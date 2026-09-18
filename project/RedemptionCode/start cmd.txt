@@ -1,0 +1,8 @@
+# 1. 確保終端機切換進入您建立的本地前端專案資料夾
+cd D:\VibeCode\project\RedemptionCode\redeem-local
+
+# 2. 啟動本地 Vite 開發伺服器
+npm run dev
+
+
+http://localhost:5173
