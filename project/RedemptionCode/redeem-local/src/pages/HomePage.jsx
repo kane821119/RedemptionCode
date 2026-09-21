@@ -1,16 +1,327 @@
 import React, { useState, useEffect } from 'react';
 import { CryptoCodeService, supabase } from '../services/cryptoCodeService.js';
 
+const styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  .cc-home * { box-sizing: border-box; }
+
+  .cc-home {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+    color: #0f172a;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    min-height: 100vh;
+  }
+
+  .cc-toast {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 14px 28px;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 500;
+    font-size: 14px;
+    z-index: 9999;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    animation: slideDown 0.3s ease;
+  }
+  .cc-toast.success { background: linear-gradient(135deg, #10b981, #059669); }
+  .cc-toast.error { background: linear-gradient(135deg, #ef4444, #dc2626); }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  .cc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 36px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .cc-header h1 {
+    margin: 0 0 6px 0;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .cc-header p {
+    margin: 0;
+    color: #64748b;
+    font-size: 15px;
+  }
+
+  .cc-user-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .cc-user-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #475569;
+    background: #fff;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  .cc-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+  }
+
+  .cc-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+  .cc-btn:active { transform: translateY(0); }
+
+  .cc-btn-primary {
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    color: #fff;
+  }
+  .cc-btn-primary:hover { box-shadow: 0 4px 16px rgba(79,70,229,0.4); }
+
+  .cc-btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: #fff;
+  }
+  .cc-btn-danger:hover { box-shadow: 0 4px 16px rgba(239,68,68,0.35); }
+
+  .cc-btn-ghost {
+    background: #fff;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+  }
+
+  .cc-btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: 8px;
+  }
+
+  .cc-admin-panel {
+    background: linear-gradient(145deg, #f5f3ff, #ede9fe);
+    border: 1.5px solid #c4b5fd;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 36px;
+    box-shadow: 0 4px 20px rgba(99,102,241,0.08);
+  }
+
+  .cc-admin-panel h3 {
+    margin: 0 0 20px 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #5b21b6;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .cc-admin-grid {
+    display: grid;
+    gap: 24px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  @media (max-width: 720px) {
+    .cc-admin-grid { grid-template-columns: 1fr; }
+  }
+
+  .cc-admin-grid h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4c1d95;
+  }
+
+  .cc-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .cc-input {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #fff;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+
+  .cc-input:focus {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+  }
+
+  .cc-check-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #334155;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .cc-check-label input {
+    width: 16px;
+    height: 16px;
+    accent-color: #6366f1;
+    cursor: pointer;
+  }
+
+  .cc-rules-box {
+    background: #fff;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+  }
+
+  .cc-rules-box p {
+    margin: 0 0 8px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  .cc-rules-box .cc-check-label {
+    margin-right: 14px;
+    margin-bottom: 4px;
+  }
+
+  .cc-form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .cc-cleanup-label {
+    font-size: 13px;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .cc-cleanup-label input {
+    width: 64px;
+    padding: 8px 10px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+    font-family: inherit;
+  }
+
+  .cc-category-grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+
+  .cc-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 22px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.25s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  .cc-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.08);
+    border-color: #c7d2fe;
+  }
+
+  .cc-card h3 {
+    margin: 0 0 12px 0;
+    font-size: 17px;
+    font-weight: 600;
+    color: #1e293b;
+  }
+
+  .cc-card-meta {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.6;
+  }
+
+  .cc-card-meta div {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .cc-card-actions {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .cc-card:hover .cc-card-actions {
+    opacity: 1;
+  }
+
+  .cc-btn-edit {
+    background: #f59e0b;
+    color: #fff;
+  }
+  .cc-btn-edit:hover { box-shadow: 0 4px 12px rgba(245,158,11,0.35); }
+
+  .cc-btn-delete {
+    background: #ef4444;
+    color: #fff;
+  }
+  .cc-btn-delete:hover { box-shadow: 0 4px 12px rgba(239,68,68,0.35); }
+`;
+
 export default function HomePage({ onSelectCategory }) {
   const [categories, setCategories] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [userName, setUserName] = useState(null); // 🔄 調整：只存放使用者名稱，不存信箱
+  const [userName, setUserName] = useState(null);
   const [status, setStatus] = useState({ show: false, message: '', type: 'success' });
 
   const [cleanupSettings, setCleanupSettings] = useState({ cleanup_report_threshold: '100' });
   const [editingCat, setEditingCat] = useState(null);
-  const [catForm, setCatForm] = useState({ 
-    name: '', showSecretKey: false, keepLetters: true, keepNumbers: true, keepSymbols: false, forceUppercase: true 
+  const [catForm, setCatForm] = useState({
+    name: '', showSecretKey: false, keepLetters: true, keepNumbers: true, keepSymbols: false, forceUppercase: true
   });
 
   const triggerStatus = (message, type = 'success') => {
@@ -21,7 +332,6 @@ export default function HomePage({ onSelectCategory }) {
   useEffect(() => {
     initHome();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      // 🔄 調整：從 Google OAuth 詮釋資料中提取使用者暱稱/姓名
       const name = session?.user?.user_metadata?.full_name || null;
       setUserName(name);
       if (session?.user) checkAdminStatus(); else setIsAdmin(false);
@@ -34,9 +344,9 @@ export default function HomePage({ onSelectCategory }) {
       const cats = await CryptoCodeService.fetchCategories();
       setCategories(cats);
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) { 
-        setUserName(user.user_metadata?.full_name || '已登入使用者'); 
-        await checkAdminStatus(); 
+      if (user) {
+        setUserName(user.user_metadata?.full_name || '已登入使用者');
+        await checkAdminStatus();
       }
     } catch (err) { triggerStatus(err.message, 'error'); }
   };
@@ -85,59 +395,150 @@ export default function HomePage({ onSelectCategory }) {
   };
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
-      {status.show && <div style={{ position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', backgroundColor: status.type === 'success' ? '#4caf50' : '#f44336', color: 'white', padding: '12px 24px', borderRadius: '8px', zIndex: 9999 }}>{status.message}</div>}
+    <div className="cc-home">
+      <style>{styles}</style>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <div><h1>兌換碼大廳</h1><p style={{ color: '#666' }}>請選擇欲查看或批次發行的項目種類</p></div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          {/* 🔄 調整：此處只渲染顯示使用者名稱 */}
-          {userName ? <><span style={{ fontSize: '14px', alignSelf: 'center' }}>👤 {userName}</span><button onClick={handleLogout} style={{ backgroundColor: '#f44336', color: 'white' }}>登出</button></> : <button onClick={handleGoogleLogin}>Google 帳號登入</button>}
-        </div>
-      </div>
-
-      {isAdmin && (
-        <div style={{ border: '2px dashed #673ab7', padding: '20px', borderRadius: '8px', marginBottom: '30px', backgroundColor: '#f5f0ff' }}>
-          <h3 style={{ color: '#673ab7', margin: '0 0 15px 0' }}>🛠️ 管理者控製面板</h3>
-          <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: '1fr 1fr' }}>
-            <div>
-              <h4>📋 {editingCat ? '修改種類屬性與過濾分割規則' : '新增兌換種類與設定規則'}</h4>
-              <form onSubmit={handleSaveCategory} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <input type="text" placeholder="種類名稱" value={catForm.name} onChange={e => setCatForm({ ...catForm, name: e.target.value })} />
-                <label><input type="checkbox" checked={catForm.showSecretKey} onChange={e => setCatForm({ ...catForm, showSecretKey: e.target.checked })} /> 顯示密碼欄位</label>
-                
-                <div style={{ background: '#fff', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}>
-                  <p style={{ margin: '0 0 5px 0', fontSize: '13px', fontWeight: 'bold' }}>⚙️ 批次分割自動過濾規則 (多選)：</p>
-                  <label style={{ marginRight: '10px' }}><input type="checkbox" checked={catForm.keepLetters} onChange={e => setCatForm({ ...catForm, keepLetters: e.target.checked })} /> 保留英文</label>
-                  <label style={{ marginRight: '10px' }}><input type="checkbox" checked={catForm.keepNumbers} onChange={e => setCatForm({ ...catForm, keepNumbers: e.target.checked })} /> 保留數字</label> <br/>
-                  <label style={{ marginRight: '10px' }}><input type="checkbox" checked={catForm.keepSymbols} onChange={e => setCatForm({ ...catForm, keepSymbols: e.target.checked })} /> 保留符號</label>
-                  <label style={{ marginRight: '10px' }}><input type="checkbox" checked={catForm.forceUppercase} onChange={e => setCatForm({ ...catForm, forceUppercase: e.target.checked })} /> 強制大寫</label>
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px' }}><button type="submit" style={{ backgroundColor: '#673ab7', color: 'white', flex: 1 }}>{editingCat ? '儲存變更' : '建立'}</button>{editingCat && <button type="button" onClick={() => { setEditingCat(null); setCatForm({ name: '', showSecretKey: false, keepLetters: true, keepNumbers: true, keepSymbols: false, forceUppercase: true }); }}>取消</button>}</div>
-              </form>
-            </div>
-            <div>
-              <h4>🧹 凌晨 03:00 自動打鎖參數</h4>
-              <label>檢舉被黑達 <input type="number" style={{ width: '60px' }} value={cleanupSettings.cleanup_report_threshold} onChange={e => setCleanupSettings({ cleanup_report_threshold: e.target.value })} /> 次自動徹底灰飛煙滅</label> <br/>
-              <button onClick={() => { CryptoCodeService.updateCleanupRules(cleanupSettings.cleanup_report_threshold); triggerStatus('清理規則已更新'); }} style={{ backgroundColor: '#e91e63', color: 'white', marginTop: '10px' }}>儲存清理規則</button>
-            </div>
-          </div>
-        </div>
+      {status.show && (
+        <div className={`cc-toast ${status.type}`}>{status.message}</div>
       )}
 
-      <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>
+      <header className="cc-header">
+        <div>
+          <h1>兌換碼大廳</h1>
+          <p>請選擇欲查看或批次發行的項目種類</p>
+        </div>
+        <div className="cc-user-bar">
+          {userName ? (
+            <>
+              <span className="cc-user-name">👤 {userName}</span>
+              <button className="cc-btn cc-btn-danger" onClick={handleLogout}>登出</button>
+            </>
+          ) : (
+            <button className="cc-btn cc-btn-primary" onClick={handleGoogleLogin}>
+              Google 帳號登入
+            </button>
+          )}
+        </div>
+      </header>
+
+      {isAdmin && (
+        <section className="cc-admin-panel">
+          <h3>🛠️ 管理者控製面板</h3>
+          <div className="cc-admin-grid">
+            <div>
+              <h4>{editingCat ? '修改種類屬性與過濾分割規則' : '新增兌換種類與設定規則'}</h4>
+              <form className="cc-form" onSubmit={handleSaveCategory}>
+                <input
+                  className="cc-input"
+                  type="text"
+                  placeholder="種類名稱"
+                  value={catForm.name}
+                  onChange={e => setCatForm({ ...catForm, name: e.target.value })}
+                />
+                <label className="cc-check-label">
+                  <input
+                    type="checkbox"
+                    checked={catForm.showSecretKey}
+                    onChange={e => setCatForm({ ...catForm, showSecretKey: e.target.checked })}
+                  />
+                  顯示密碼欄位
+                </label>
+
+                <div className="cc-rules-box">
+                  <p>⚙️ 批次分割自動過濾規則（多選）</p>
+                  <label className="cc-check-label">
+                    <input type="checkbox" checked={catForm.keepLetters} onChange={e => setCatForm({ ...catForm, keepLetters: e.target.checked })} />
+                    保留英文
+                  </label>
+                  <label className="cc-check-label">
+                    <input type="checkbox" checked={catForm.keepNumbers} onChange={e => setCatForm({ ...catForm, keepNumbers: e.target.checked })} />
+                    保留數字
+                  </label>
+                  <br />
+                  <label className="cc-check-label">
+                    <input type="checkbox" checked={catForm.keepSymbols} onChange={e => setCatForm({ ...catForm, keepSymbols: e.target.checked })} />
+                    保留符號
+                  </label>
+                  <label className="cc-check-label">
+                    <input type="checkbox" checked={catForm.forceUppercase} onChange={e => setCatForm({ ...catForm, forceUppercase: e.target.checked })} />
+                    強制大寫
+                  </label>
+                </div>
+
+                <div className="cc-form-actions">
+                  <button type="submit" className="cc-btn cc-btn-primary" style={{ flex: 1 }}>
+                    {editingCat ? '儲存變更' : '建立種類'}
+                  </button>
+                  {editingCat && (
+                    <button
+                      type="button"
+                      className="cc-btn cc-btn-ghost"
+                      onClick={() => {
+                        setEditingCat(null);
+                        setCatForm({ name: '', showSecretKey: false, keepLetters: true, keepNumbers: true, keepSymbols: false, forceUppercase: true });
+                      }}
+                    >
+                      取消
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            <div>
+              <h4>🧹 凌晨 03:00 自動打鎖參數</h4>
+              <label className="cc-cleanup-label">
+                檢舉被黑達
+                <input
+                  type="number"
+                  value={cleanupSettings.cleanup_report_threshold}
+                  onChange={e => setCleanupSettings({ cleanup_report_threshold: e.target.value })}
+                />
+                次自動徹底灰飛煙滅
+              </label>
+              <button
+                className="cc-btn"
+                style={{ background: 'linear-gradient(135deg, #ec4899, #db2777)', color: '#fff', marginTop: 14 }}
+                onClick={() => {
+                  CryptoCodeService.updateCleanupRules(cleanupSettings.cleanup_report_threshold);
+                  triggerStatus('清理規則已更新');
+                }}
+              >
+                儲存清理規則
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      <div className="cc-category-grid">
         {categories.map(cat => (
-          <div key={cat.id} onClick={() => onSelectCategory(cat.id)} style={{ border: '1px solid #ddd', padding: '20px', borderRadius: '8px', cursor: 'pointer', backgroundColor: '#fff', position: 'relative' }}>
-            <h3 style={{ margin: '0 0 10px 0' }}>{cat.name}</h3>
-            <div style={{ fontSize: '11px', color: '#777', lineHeight: '1.4' }}>
+          <div key={cat.id} className="cc-card" onClick={() => onSelectCategory(cat.id)}>
+            <h3>{cat.name}</h3>
+            <div className="cc-card-meta">
               <div>{cat.show_secret_key ? '🔒 帶密碼模式' : '🔓 免密碼模式'}</div>
-              <div>規則: {cat.force_uppercase && '大寫 '}{cat.keep_letters && '英文 '}{cat.keep_numbers && '數字 '}{cat.keep_symbols && '符號 '}</div>
+              <div>
+                規則：
+                {cat.force_uppercase && '大寫 '}
+                {cat.keep_letters && '英文 '}
+                {cat.keep_numbers && '數字 '}
+                {cat.keep_symbols && '符號 '}
+              </div>
             </div>
             {isAdmin && (
-              <div style={{ position: 'absolute', top: '15px', right: '15px', display: 'flex', gap: '5px' }}>
-                <button onClick={(e) => { e.stopPropagation(); handleEditClick(cat); }} style={{ backgroundColor: '#ff9800', color: 'white' }}>改</button>
-                <button onClick={(e) => handleDeleteCategory(cat.id, e)} style={{ backgroundColor: '#f44336', color: 'white' }}>刪</button>
+              <div className="cc-card-actions">
+                <button
+                  className="cc-btn cc-btn-sm cc-btn-edit"
+                  onClick={(e) => { e.stopPropagation(); handleEditClick(cat); }}
+                >
+                  改
+                </button>
+                <button
+                  className="cc-btn cc-btn-sm cc-btn-delete"
+                  onClick={(e) => handleDeleteCategory(cat.id, e)}
+                >
+                  刪
+                </button>
               </div>
             )}
           </div>
