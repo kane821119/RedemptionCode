@@ -1,0 +1,159 @@
+import { create } from 'zustand';
+import { supabase } from '../services/supabaseClient';
+
+export const useSystemStore = create((set, get) => ({
+  categories: [],
+  systemSettings: { cleanup_report_threshold: '20' },
+  messages: [],
+  bannedEmails: [], // 儲存已被封鎖的黑名單 Email 清單
+  toast: { show: false, message: '', type: 'success' },
+
+  showToast: (message, type = 'success') => {
+    set({ toast: { show: true, message, type } });
+    setTimeout(() => set({ toast: { show: false, message: '', type: 'success' } }), 3000);
+  },
+
+  // 1. 複合式快取控制（綁定分類 ID 與序號文字，防刪除大類重建後序號誤遮蔽）
+  CACHE_KEY: 'used_codes_pool_v3',
+  getLocalCache: () => JSON.parse(localStorage.getItem(get().CACHE_KEY) || '{}'),
+  
+  saveToLocalCache: (categoryId, code, statusType) => {
+    const pool = get().getLocalCache();
+    const compositeKey = `${categoryId}_${code}`;
+    pool[compositeKey] = statusType;
+    localStorage.setItem(get().CACHE_KEY, JSON.stringify(pool));
+  },
+
+  // 2. 分類與全域設定 CRUD
+  fetchCategories: async () => {
+    const { data, error } = await supabase.from('categories').select('*').order('name');
+    if (error) throw error;
+    set({ categories: data });
+  },
+
+  createCategory: async (payload) => {
+    const { error } = await supabase.rpc('api_create_category', {
+      p_name: payload.name, p_show_secret: payload.showSecretKey, p_keep_letters: payload.keepLetters,
+      p_keep_numbers: payload.keepNumbers, p_keep_symbols: payload.keepSymbols, p_force_upper: payload.forceUppercase
+    });
+    if (error) throw error;
+    await get().fetchCategories();
+  },
+
+  updateCategory: async (id, payload) => {
+    const { error } = await supabase.rpc('api_update_category', {
+      p_id: id, p_name: payload.name, p_show_secret: payload.showSecretKey, p_keep_letters: payload.keepLetters,
+      p_keep_numbers: payload.keepNumbers, p_keep_symbols: payload.keepSymbols, p_force_upper: payload.forceUppercase
+    });
+    if (error) throw error;
+    await get().fetchCategories();
+  },
+
+  deleteCategory: async (id) => {
+    const { error } = await supabase.rpc('api_delete_category', { p_id: id });
+    if (error) throw error;
+    await get().fetchCategories();
+  },
+
+  fetchSystemSettings: async () => {
+    const { data, error } = await supabase.from('system_settings').select('*');
+    if (error) throw error;
+    const settings = data.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
+    set({ systemSettings: settings });
+  },
+
+  updateCleanupRules: async (threshold) => {
+    const { error } = await supabase.rpc('api_update_system_settings', { p_key: 'cleanup_report_threshold', p_value: threshold.toString() });
+    if (error) throw error;
+    set((state) => ({ systemSettings: { ...state.systemSettings, cleanup_report_threshold: threshold.toString() } }));
+  },
+
+  // 3. 代碼資料操作
+  fetchCodesOfCategory: async () => {
+    const { data, error } = await supabase.from('codes').select('*');
+    if (error) throw error;
+    return data;
+  },
+
+  insertCodesBulk: async (payload) => {
+    const { data, error } = await supabase.rpc('api_insert_codes_bulk', {
+      p_category_id: payload.categoryId,
+      p_codes: payload.codesArray,
+      p_secrets: payload.secretsArray,
+      p_contributor: payload.contributorName
+    });
+    if (error) throw error;
+    return data; // 精確回傳後端實際寫入成功的筆數
+  },
+
+  batchSubmitChanges: async (categoryId, items) => {
+    const reportedIds = [];
+    const localCache = get().getLocalCache();
+
+    items.forEach(item => {
+      const compositeKey = `${categoryId}_${item.code}`;
+      
+      if (item.isReported) {
+        if (localCache[compositeKey] !== 'reported') {
+          get().saveToLocalCache(categoryId, item.code, 'reported');
+          reportedIds.push(item.id);
+        }
+      } else if (item.isUsed && localCache[compositeKey] !== 'used') {
+        get().saveToLocalCache(categoryId, item.code, 'used');
+      }
+    });
+
+    if (reportedIds.length > 0) {
+      const { error } = await supabase.rpc('batch_report_codes', { code_ids: reportedIds });
+      if (error) throw error;
+    }
+  },
+
+  // 4. 大廳獨立留言板功能（含黑名單防禦、特赦擴充）
+  fetchMessages: async () => {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    set({ messages: data });
+  },
+
+  fetchBannedUsers: async () => {
+    const { data, error } = await supabase.from('banned_users').select('email');
+    if (error) throw error;
+    set({ bannedEmails: (data || []).map(b => b.email) });
+  },
+
+  createMessage: async (content, userName) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('請先登入帳號');
+    
+    const { error } = await supabase.from('messages').insert({
+      user_id: user.id,
+      user_name: userName,
+      user_email: user.email, 
+      content: content.trim()
+    });
+    if (error) throw error;
+    await get().fetchMessages();
+  },
+
+  banUserEmail: async (email) => {
+    const { error } = await supabase.from('banned_users').insert({ email });
+    if (error) throw error;
+    await get().fetchBannedUsers(); // 封鎖成功後自動重新整理黑名單暫存
+  },
+
+  removeBanUserEmail: async (email) => {
+    const { error } = await supabase.from('banned_users').delete().eq('email', email);
+    if (error) throw error;
+    await get().fetchBannedUsers(); // 解除成功後自動重新整理黑名單暫存
+  },
+
+  deleteMessage: async (id) => {
+    const { error } = await supabase.from('messages').delete().eq('id', id);
+    if (error) throw error;
+    await get().fetchMessages();
+  }
+}));

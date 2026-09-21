@@ -1,540 +1,242 @@
-import React, { useState, useEffect } from 'react';
-import { CryptoCodeService, supabase } from '../services/cryptoCodeService.js';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useSystemStore } from '../store/systemStore';
+import { useAuthStore } from '../store/authStore';
 
-const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+export default function HomePage({ onSelectCategory, onNavigateToChat }) {
+  const { categories, systemSettings, fetchCategories, createCategory, updateCategory, deleteCategory, fetchSystemSettings, updateCleanupRules, showToast } = useSystemStore();
+  const { userName, isAdmin, loginWithGoogle, logout, loading: authLoading } = useAuthStore();
 
-  .cc-home * { box-sizing: border-box; }
-
-  .cc-home {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 16px 14px 60px;
-    color: #0f172a;
-    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-    min-height: 100vh;
-  }
-
-  .cc-toast {
-    position: fixed;
-    top: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 12px 20px;
-    border-radius: 12px;
-    color: #fff;
-    font-weight: 500;
-    font-size: 14px;
-    z-index: 9999;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-    animation: slideDown 0.3s ease;
-    max-width: calc(100vw - 32px);
-    text-align: center;
-  }
-  .cc-toast.success { background: linear-gradient(135deg, #10b981, #059669); }
-  .cc-toast.error { background: linear-gradient(135deg, #ef4444, #dc2626); }
-
-  @keyframes slideDown {
-    from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
-    to { opacity: 1; transform: translateX(-50%) translateY(0); }
-  }
-
-  .cc-header {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    margin-bottom: 24px;
-  }
-
-  .cc-header-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .cc-header h1 {
-    margin: 0 0 4px 0;
-    font-size: 24px;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    background: linear-gradient(135deg, #4f46e5, #7c3aed);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .cc-header p {
-    margin: 0;
-    color: #64748b;
-    font-size: 14px;
-  }
-
-  .cc-user-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .cc-user-name {
-    font-size: 13px;
-    font-weight: 500;
-    color: #475569;
-    background: #fff;
-    padding: 8px 12px;
-    border-radius: 999px;
-    border: 1px solid #e2e8f0;
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .cc-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 10px 16px;
-    border: none;
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-family: inherit;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .cc-btn:active { transform: scale(0.97); }
-
-  .cc-btn-primary {
-    background: linear-gradient(135deg, #4f46e5, #6366f1);
-    color: #fff;
-  }
-
-  .cc-btn-danger {
-    background: linear-gradient(135deg, #ef4444, #dc2626);
-    color: #fff;
-  }
-
-  .cc-btn-ghost {
-    background: #fff;
-    color: #475569;
-    border: 1px solid #e2e8f0;
-  }
-
-  .cc-btn-sm {
-    padding: 8px 12px;
-    font-size: 13px;
-    border-radius: 8px;
-  }
-
-  .cc-admin-panel {
-    background: linear-gradient(145deg, #f5f3ff, #ede9fe);
-    border: 1.5px solid #c4b5fd;
-    border-radius: 14px;
-    padding: 16px;
-    margin-bottom: 24px;
-  }
-
-  .cc-admin-panel h3 {
-    margin: 0 0 16px 0;
-    font-size: 16px;
-    font-weight: 700;
-    color: #5b21b6;
-  }
-
-  .cc-admin-section {
-    margin-bottom: 20px;
-  }
-
-  .cc-admin-section:last-child {
-    margin-bottom: 0;
-  }
-
-  .cc-admin-section h4 {
-    margin: 0 0 10px 0;
-    font-size: 13px;
-    font-weight: 600;
-    color: #4c1d95;
-  }
-
-  .cc-form {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .cc-input {
-    width: 100%;
-    padding: 12px 14px;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 10px;
-    font-size: 15px;
-    font-family: inherit;
-    background: #fff;
-    outline: none;
-  }
-
-  .cc-input:focus {
-    border-color: #818cf8;
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
-  }
-
-  .cc-check-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: #334155;
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .cc-check-label input {
-    width: 18px;
-    height: 18px;
-    accent-color: #6366f1;
-    cursor: pointer;
-  }
-
-  .cc-rules-box {
-    background: #fff;
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid #e2e8f0;
-  }
-
-  .cc-rules-box p {
-    margin: 0 0 8px 0;
-    font-size: 12px;
-    font-weight: 600;
-    color: #64748b;
-  }
-
-  .cc-rules-box .cc-check-label {
-    margin-right: 12px;
-    margin-bottom: 6px;
-  }
-
-  .cc-form-actions {
-    display: flex;
-    gap: 8px;
-  }
-
-  .cc-form-actions .cc-btn {
-    flex: 1;
-  }
-
-  .cc-cleanup-label {
-    font-size: 13px;
-    color: #475569;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-
-  .cc-cleanup-label input {
-    width: 64px;
-    padding: 10px;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 14px;
-    text-align: center;
-    font-family: inherit;
-  }
-
-  .cc-category-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .cc-card {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 18px;
-    cursor: pointer;
-    position: relative;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .cc-card:active {
-    border-color: #c7d2fe;
-    box-shadow: 0 4px 12px rgba(99,102,241,0.12);
-  }
-
-  .cc-card h3 {
-    margin: 0 0 10px 0;
-    font-size: 17px;
-    font-weight: 600;
-    color: #1e293b;
-    padding-right: 70px;
-  }
-
-  .cc-card-meta {
-    font-size: 12px;
-    color: #64748b;
-    line-height: 1.6;
-  }
-
-  .cc-card-actions {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    display: flex;
-    gap: 6px;
-  }
-
-  .cc-btn-edit {
-    background: #f59e0b;
-    color: #fff;
-  }
-
-  .cc-btn-delete {
-    background: #ef4444;
-    color: #fff;
-  }
-`;
-
-export default function HomePage({ onSelectCategory }) {
-  const [categories, setCategories] = useState([]);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [userName, setUserName] = useState(null);
-  const [status, setStatus] = useState({ show: false, message: '', type: 'success' });
-
-  const [cleanupSettings, setCleanupSettings] = useState({ cleanup_report_threshold: '100' });
+  const [cleanupThreshold, setCleanupThreshold] = useState('100');
   const [editingCat, setEditingCat] = useState(null);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(''); 
+  
   const [catForm, setCatForm] = useState({
     name: '', showSecretKey: false, keepLetters: true, keepNumbers: true, keepSymbols: false, forceUppercase: true
   });
 
-  const triggerStatus = (message, type = 'success') => {
-    setStatus({ show: true, message, type });
-    setTimeout(() => setStatus(prev => ({ ...prev, show: false })), 3000);
-  };
-
   useEffect(() => {
-    initHome();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      const name = session?.user?.user_metadata?.full_name || null;
-      setUserName(name);
-      if (session?.user) checkAdminStatus(); else setIsAdmin(false);
-    });
-    return () => subscription.unsubscribe();
+    fetchCategories().catch(err => showToast(`無法載入分類: ${err.message}`, 'error'));
+    fetchSystemSettings().catch(() => {});
   }, []);
 
-  const initHome = async () => {
-    try {
-      const cats = await CryptoCodeService.fetchCategories();
-      setCategories(cats);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserName(user.user_metadata?.full_name || '已登入使用者');
-        await checkAdminStatus();
-      }
-    } catch (err) { triggerStatus(err.message, 'error'); }
-  };
-
-  const checkAdminStatus = async () => {
-    const adminCheck = await CryptoCodeService.checkIsAdmin();
-    setIsAdmin(adminCheck);
-    if (adminCheck) {
-      const settings = await CryptoCodeService.fetchSystemSettings();
-      if (settings.cleanup_report_threshold) setCleanupSettings(settings);
+  useEffect(() => {
+    if (systemSettings.cleanup_report_threshold) {
+      setCleanupThreshold(systemSettings.cleanup_report_threshold);
     }
-  };
+  }, [systemSettings]);
 
-  const handleGoogleLogin = async () => { await supabase.auth.signInWithOAuth({ provider: 'google' }); };
-  const handleLogout = async () => { await supabase.auth.signOut(); triggerStatus('已登出'); };
+  // ⚡ 多關鍵字片段模糊比對 + 本地點擊次數熱度置頂排序核心演算法
+  const processedCategories = useMemo(() => {
+    const clickCounts = JSON.parse(localStorage.getItem('category_usage_clicks_v2') || '{}');
+    const searchTokens = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    
+    return categories
+      .filter(cat => {
+        if (searchTokens.length === 0) return true;
+        const categoryNameLower = cat.name.toLowerCase();
+        return searchTokens.some(token => categoryNameLower.includes(token));
+      })
+      .sort((a, b) => {
+        const countA = clickCounts[a.id] || 0;
+        const countB = clickCounts[b.id] || 0;
+        return countB - countA;
+      });
+  }, [categories, searchQuery]);
+
+  // 觸發點擊跳轉時，本地自動累加點擊權重次數
+  const handleCategorySelect = (catId) => {
+    const clickCounts = JSON.parse(localStorage.getItem('category_usage_clicks_v2') || '{}');
+    clickCounts[catId] = (clickCounts[catId] || 0) + 1;
+    localStorage.setItem('category_usage_clicks_v2', JSON.stringify(clickCounts));
+    onSelectCategory(catId);
+  };
 
   const handleSaveCategory = async (e) => {
     e.preventDefault();
-    if (!catForm.name) return triggerStatus('請輸入名稱', 'error');
+    if (!catForm.name.trim()) return showToast('請填寫分類名稱', 'error');
     try {
       if (editingCat) {
-        await CryptoCodeService.updateCategory(editingCat.id, catForm);
-        triggerStatus('種類修改成功！');
+        await updateCategory(editingCat.id, catForm);
+        showToast('分類卡片屬性修改成功！');
       } else {
-        await CryptoCodeService.createCategory(catForm);
-        triggerStatus('種類建立成功！');
+        await createCategory(catForm);
+        showToast('新分類卡片建立成功！');
       }
       setCatForm({ name: '', showSecretKey: false, keepLetters: true, keepNumbers: true, keepSymbols: false, forceUppercase: true });
       setEditingCat(null);
-      initHome();
-    } catch (err) { triggerStatus(err.message, 'error'); }
+    } catch (err) { showToast(err.message, 'error'); }
   };
 
   const handleEditClick = (cat) => {
     setEditingCat(cat);
+    setIsPanelOpen(true);
     setCatForm({
       name: cat.name, showSecretKey: cat.show_secret_key, keepLetters: cat.keep_letters,
       keepNumbers: cat.keep_numbers, keepSymbols: cat.keep_symbols, forceUppercase: cat.force_uppercase
     });
   };
-
-  const handleDeleteCategory = async (id, e) => {
-    e.stopPropagation();
-    if (!window.confirm('確定刪除此種類？其下的所有兌換碼將會被連帶刪除！')) return;
-    try { await CryptoCodeService.deleteCategory(id); triggerStatus('種類已刪除'); initHome(); } catch (err) { triggerStatus(err.message, 'error'); }
-  };
-
   return (
-    <div className="cc-home">
-      <style>{styles}</style>
+    <div className="max-w-md mx-auto px-4 py-6 pb-28 bg-slate-50 min-h-screen font-sans selection:bg-blue-500 selection:text-white">
+      
+      {/* 頂部導覽卡片 */}
+      <header className="bg-white border border-slate-200/70 rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.015)] flex justify-between items-center gap-4 mb-5">
+        <div>
+          <h1 className="text-xl font-black tracking-tight text-slate-900">
+            代碼集散廳
+          </h1>
+          <p className="text-[10px] font-black text-blue-600 tracking-widest uppercase mt-0.5">
+            Card Dashboard
+          </p>
+        </div>
 
-      {status.show && (
-        <div className={`cc-toast ${status.type}`}>{status.message}</div>
-      )}
+        {!authLoading && (
+          <div className="flex items-center gap-1.5">
+            
+            {/* ✨ 新增：置頂一體化純白大廳留言板按鈕 */}
+            <button 
+              onClick={onNavigateToChat}
+              className="px-2.5 py-2 text-xs font-bold bg-white text-slate-600 border border-slate-200 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.01)] hover:bg-slate-50 hover:text-blue-600 active:scale-95 transition-all flex items-center gap-1"
+            >
+              <span>💬 交流</span>
+            </button>
 
-      <header className="cc-header">
-        <div className="cc-header-top">
-          <div>
-            <h1>兌換碼大廳</h1>
-            <p>選擇欲查看或批次發行的種類</p>
-          </div>
-          <div className="cc-user-bar">
             {userName ? (
-              <>
-                <span className="cc-user-name">👤 {userName}</span>
-                <button className="cc-btn cc-btn-danger cc-btn-sm" onClick={handleLogout}>登出</button>
-              </>
+              <div className="flex items-center gap-1.5 pl-0.5">
+                <div className="flex flex-col items-end">
+                  <span className="text-xs font-bold text-slate-800 truncate max-w-[80px]">{userName}</span>
+                  {isAdmin && (
+                    <span className="text-[8px] font-black text-amber-600 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 mt-0.5">
+                      管理者
+                    </span>
+                  )}
+                </div>
+                <button onClick={logout} className="p-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500 rounded-xl transition text-xs font-bold">
+                  🚪
+                </button>
+              </div>
             ) : (
-              <button className="cc-btn cc-btn-primary cc-btn-sm" onClick={handleGoogleLogin}>
+              <button 
+                onClick={loginWithGoogle} 
+                className="px-3 py-2 text-xs font-bold bg-white text-slate-700 border border-slate-200 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.03)] hover:bg-slate-50 hover:border-slate-300 active:scale-95 transition-all"
+              >
                 Google 登入
               </button>
             )}
           </div>
-        </div>
+        )}
       </header>
 
+      {/* 搜尋卡片 */}
+      <div className="bg-white border border-slate-200/70 rounded-2xl p-3 shadow-[0_2px_8px_rgba(0,0,0,0.01)] mb-4 flex items-center gap-2.5">
+        <span className="text-sm pl-1 text-slate-400">🔍</span>
+        <input 
+          type="text" 
+          className="w-full text-xs font-semibold bg-transparent border-none text-slate-800 placeholder-slate-400 focus:outline-none py-1"
+          placeholder="輸入類別名稱即時搜尋過濾..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')} className="text-[10px] font-bold text-slate-400 bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded-md transition">清除</button>
+        )}
+      </div>
+
+      {/* 管理者控製麵板 */}
       {isAdmin && (
-        <section className="cc-admin-panel">
-          <h3>🛠️ 管理者控製面板</h3>
+        <div className="mb-4">
+          <button 
+            onClick={() => setIsPanelOpen(!isPanelOpen)} 
+            className="w-full bg-white text-slate-800 p-4 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.015)] flex justify-between items-center active:scale-[0.99] transition-all border border-slate-200/80 relative overflow-hidden group"
+          >
+            <div className="absolute top-0 left-0 bottom-0 w-1 bg-blue-600 opacity-60"></div>
+            <span className="text-xs font-black text-slate-700 tracking-wider flex items-center gap-2 pl-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+              {isPanelOpen ? '收起系統管理中心' : '展開系統管理中心'}
+            </span>
+            <span className="text-xs text-slate-400 font-bold">{isPanelOpen ? '▲' : '▼'}</span>
+          </button>
 
-          <div className="cc-admin-section">
-            <h4>{editingCat ? '修改種類屬性與過濾規則' : '新增兌換種類與設定規則'}</h4>
-            <form className="cc-form" onSubmit={handleSaveCategory}>
-              <input
-                className="cc-input"
-                type="text"
-                placeholder="種類名稱"
-                value={catForm.name}
-                onChange={e => setCatForm({ ...catForm, name: e.target.value })}
-              />
-              <label className="cc-check-label">
-                <input
-                  type="checkbox"
-                  checked={catForm.showSecretKey}
-                  onChange={e => setCatForm({ ...catForm, showSecretKey: e.target.checked })}
-                />
-                顯示密碼欄位
-              </label>
-
-              <div className="cc-rules-box">
-                <p>⚙️ 批次分割過濾規則</p>
-                <label className="cc-check-label">
-                  <input type="checkbox" checked={catForm.keepLetters} onChange={e => setCatForm({ ...catForm, keepLetters: e.target.checked })} />
-                  英文
-                </label>
-                <label className="cc-check-label">
-                  <input type="checkbox" checked={catForm.keepNumbers} onChange={e => setCatForm({ ...catForm, keepNumbers: e.target.checked })} />
-                  數字
-                </label>
-                <label className="cc-check-label">
-                  <input type="checkbox" checked={catForm.keepSymbols} onChange={e => setCatForm({ ...catForm, keepSymbols: e.target.checked })} />
-                  符號
-                </label>
-                <label className="cc-check-label">
-                  <input type="checkbox" checked={catForm.forceUppercase} onChange={e => setCatForm({ ...catForm, forceUppercase: e.target.checked })} />
-                  強制大寫
-                </label>
+          {isPanelOpen && (
+            <section className="bg-white border border-slate-200/80 rounded-2xl p-4 mt-2 shadow-[0_4px_20px_rgba(0,0,0,0.02)] space-y-4 animate-fadeIn relative overflow-hidden">
+              <div className="absolute top-0 left-0 bottom-0 w-1 bg-blue-600 opacity-30"></div>
+              <div className="bg-slate-50/60 p-4 rounded-xl border border-slate-200/50 pl-5">
+                <h4 className="font-black text-blue-600 mb-3 text-xs tracking-wider uppercase">{editingCat ? '✏️ 編輯類型屬性' : '✨ 建立通用類型卡片'}</h4>
+                <form onSubmit={handleSaveCategory} className="space-y-4">
+                  <input type="text" className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-xs text-slate-800 placeholder-slate-400 shadow-inner" placeholder="輸入分類名稱" value={catForm.name} onChange={e => setCatForm({ ...catForm, name: e.target.value })} />
+                  <label className="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-slate-600 py-1 select-none">
+                    <input type="checkbox" className="w-4 h-4 rounded accent-blue-600 bg-white border-slate-300" checked={catForm.showSecretKey} onChange={e => setCatForm({ ...catForm, showSecretKey: e.target.checked })} />
+                    <span>此分類啟用額外「密碼 / 隨附金鑰」</span>
+                  </label>
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 text-[11px] shadow-inner">
+                    <p className="font-bold text-slate-400 mb-2">⚙️ 智慧切割提取字元白名單</p>
+                    <div className="grid grid-cols-2 gap-2 text-slate-600 font-medium">
+                      <label className="flex items-center gap-1.5"><input type="checkbox" className="accent-blue-600" checked={catForm.keepLetters} onChange={e => setCatForm({ ...catForm, keepLetters: e.target.checked })} /> 英文 (A-Z)</label>
+                      <label className="flex items-center gap-1.5"><input type="checkbox" className="accent-blue-600" checked={catForm.keepNumbers} onChange={e => setCatForm({ ...catForm, keepNumbers: e.target.checked })} /> 數字 (0-9)</label>
+                      <label className="flex items-center gap-1.5"><input type="checkbox" className="accent-blue-600" checked={catForm.keepSymbols} onChange={e => setCatForm({ ...catForm, keepSymbols: e.target.checked })} /> 基本符號</label>
+                      <label className="flex items-center gap-1.5 text-blue-600 font-bold"><input type="checkbox" className="accent-blue-600" checked={catForm.forceUppercase} onChange={e => setCatForm({ ...catForm, forceUppercase: e.target.checked })} /> 強制轉大寫</label>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="submit" className="flex-1 py-2.5 bg-blue-600 text-white font-bold rounded-xl text-xs hover:bg-blue-500 transition active:scale-95 shadow-md shadow-blue-500/10">{editingCat ? '儲存變更' : '建立卡片'}</button>
+                    {editingCat && <button type="button" onClick={() => { setEditingCat(null); setCatForm({ name: '', showSecretKey: false, keepLetters: true, keepNumbers: true, keepSymbols: false, forceUppercase: true }); }} className="px-4 bg-slate-200 text-slate-600 font-bold rounded-xl text-xs">取消</button>}
+                  </div>
+                </form>
               </div>
-
-              <div className="cc-form-actions">
-                <button type="submit" className="cc-btn cc-btn-primary">
-                  {editingCat ? '儲存變更' : '建立種類'}
-                </button>
-                {editingCat && (
-                  <button
-                    type="button"
-                    className="cc-btn cc-btn-ghost"
-                    onClick={() => {
-                      setEditingCat(null);
-                      setCatForm({ name: '', showSecretKey: false, keepLetters: true, keepNumbers: true, keepSymbols: false, forceUppercase: true });
-                    }}
-                  >
-                    取消
-                  </button>
-                )}
+              <div className="bg-slate-50/60 p-4 rounded-xl border border-slate-200/50 text-xs pl-5">
+                <h4 className="font-black text-slate-500 mb-2 tracking-wider">🧹 凌晨自動清理排程參數</h4>
+                <div className="flex items-center gap-2 flex-wrap text-slate-600 mb-3 font-medium">
+                  <span>不重複檢舉累計達</span>
+                  <input type="number" className="w-14 p-1.5 text-center bg-white border border-slate-200 rounded-lg text-slate-800 font-bold text-xs" value={cleanupThreshold} onChange={e => setCleanupThreshold(e.target.value)} />
+                  <span>次，自動從雲端完全抹除</span>
+                </div>
+                <button onClick={() => { updateCleanupRules(cleanupThreshold); showToast('後端自動清理規則更新成功！'); }} className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs active:scale-95 transition-all border border-slate-200">儲存排程規則</button>
               </div>
-            </form>
-          </div>
-
-          <div className="cc-admin-section">
-            <h4>🧹 凌晨 03:00 自動清理</h4>
-            <label className="cc-cleanup-label">
-              檢舉達
-              <input
-                type="number"
-                value={cleanupSettings.cleanup_report_threshold}
-                onChange={e => setCleanupSettings({ cleanup_report_threshold: e.target.value })}
-              />
-              次自動刪除
-            </label>
-            <button
-              className="cc-btn"
-              style={{ background: 'linear-gradient(135deg, #ec4899, #db2777)', color: '#fff', marginTop: 12, width: '100%' }}
-              onClick={() => {
-                CryptoCodeService.updateCleanupRules(cleanupSettings.cleanup_report_threshold);
-                triggerStatus('清理規則已更新');
-              }}
-            >
-              儲存清理規則
-            </button>
-          </div>
-        </section>
+            </section>
+          )}
+        </div>
       )}
-
-      <div className="cc-category-grid">
-        {categories.map(cat => (
-          <div key={cat.id} className="cc-card" onClick={() => onSelectCategory(cat.id)}>
-            <h3>{cat.name}</h3>
-            <div className="cc-card-meta">
-              <div>{cat.show_secret_key ? '🔒 帶密碼模式' : '🔓 免密碼模式'}</div>
-              <div>
-                規則：
-                {cat.force_uppercase && '大寫 '}
-                {cat.keep_letters && '英文 '}
-                {cat.keep_numbers && '數字 '}
-                {cat.keep_symbols && '符號 '}
-              </div>
-            </div>
-            {isAdmin && (
-              <div className="cc-card-actions">
-                <button
-                  className="cc-btn cc-btn-sm cc-btn-edit"
-                  onClick={(e) => { e.stopPropagation(); handleEditClick(cat); }}
-                >
-                  改
-                </button>
-                <button
-                  className="cc-btn cc-btn-sm cc-btn-delete"
-                  onClick={(e) => handleDeleteCategory(cat.id, e)}
-                >
-                  刪
-                </button>
-              </div>
-            )}
+      {/* 核心網格卡片池清單區塊：已移除厚重的留言卡片傳送門 */}
+      <div className="space-y-3">
+        <h2 className="text-xs font-black tracking-widest text-slate-400 uppercase px-0.5">📁 現有代碼池類別</h2>
+        {processedCategories.length === 0 ? (
+          <div className="text-center py-10 bg-white border border-slate-200 rounded-2xl text-slate-400 text-xs px-4">
+            {searchQuery ? '找不到相符的類別名稱卡片' : '大廳目前空無一物，請透過管理面板建立。'}
           </div>
-        ))}
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {processedCategories.map(cat => {
+              const usageCount = JSON.parse(localStorage.getItem('category_usage_clicks_v2') || '{}')[cat.id] || 0;
+              return (
+                <div key={cat.id} onClick={() => handleCategorySelect(cat.id)} className="bg-white border border-slate-200/70 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.015)] hover:shadow-md hover:border-blue-200 transition-all duration-200 active:scale-[0.97] cursor-pointer flex flex-col justify-between min-h-[120px] relative group overflow-hidden">
+                  <div className="absolute top-0 left-0 bottom-0 w-1 bg-blue-600 opacity-40 group-hover:opacity-100 transition-all"></div>
+                  <div>
+                    <div className="flex justify-between items-start gap-1.5">
+                      <h3 className="text-sm font-extrabold text-slate-800 line-clamp-2 group-hover:text-blue-600 transition-colors tracking-tight leading-tight flex-1">{cat.name}</h3>
+                      {usageCount > 0 && <span className="text-[8px] bg-blue-50 text-blue-600 px-1 rounded font-black shrink-0 shadow-inner">⚡{usageCount}</span>}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${cat.show_secret_key ? 'bg-blue-50 text-blue-700 border border-blue-100/50' : 'bg-slate-100 text-slate-600'}`}>{cat.show_secret_key ? '🔒 帶金鑰' : '🔓 免密'}</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap gap-1 items-center max-w-[75%]">
+                      {[cat.keep_letters && '英文', cat.keep_numbers && '數字', cat.keep_symbols && '符號', cat.force_uppercase && '大寫'].filter(Boolean).map((ruleName, idx) => (
+                        <span key={idx} className="text-[8px] font-extrabold bg-slate-50 text-slate-500 border border-slate-200/60 px-1 rounded whitespace-nowrap">{ruleName}</span>
+                      ))}
+                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => handleEditClick(cat)} className="p-1 text-[11px] bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 border border-slate-200 rounded-md active:scale-90 transition shadow-sm">✏️</button>
+                        <button onClick={async () => { if (window.confirm('確定刪除種類卡片？其下的所有代碼將會被連帶完全清除！')) { await deleteCategory(cat.id); showToast('類別卡片已完全移除'); } }} className="p-1 text-[11px] bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 rounded-md active:scale-90 transition shadow-sm">🗑️</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
