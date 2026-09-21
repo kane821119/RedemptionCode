@@ -8,9 +8,9 @@ const styles = `
 
   .cc-detail {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    max-width: 1100px;
+    max-width: 720px;
     margin: 0 auto;
-    padding: 28px 20px 80px;
+    padding: 16px 14px 80px;
     color: #0f172a;
     background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
     min-height: 100vh;
@@ -18,10 +18,10 @@ const styles = `
 
   .cc-toast {
     position: fixed;
-    top: 24px;
+    top: 16px;
     left: 50%;
     transform: translateX(-50%);
-    padding: 14px 28px;
+    padding: 12px 20px;
     border-radius: 12px;
     color: #fff;
     font-weight: 500;
@@ -29,6 +29,8 @@ const styles = `
     z-index: 9999;
     box-shadow: 0 10px 40px rgba(0,0,0,0.15);
     animation: slideDown 0.3s ease;
+    max-width: calc(100vw - 32px);
+    text-align: center;
   }
   .cc-toast.success { background: linear-gradient(135deg, #10b981, #059669); }
   .cc-toast.error { background: linear-gradient(135deg, #ef4444, #dc2626); }
@@ -40,22 +42,25 @@ const styles = `
 
   .cc-topbar {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 28px;
-    gap: 16px;
-    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
   }
 
   .cc-topbar h2 {
     margin: 0;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 700;
     letter-spacing: -0.02em;
     background: linear-gradient(135deg, #4f46e5, #7c3aed);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .cc-btn {
@@ -63,7 +68,7 @@ const styles = `
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 10px 18px;
+    padding: 10px 16px;
     border: none;
     border-radius: 10px;
     font-size: 14px;
@@ -71,38 +76,41 @@ const styles = `
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .cc-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
-  .cc-btn:active { transform: translateY(0); }
+  .cc-btn:active { transform: scale(0.97); }
 
   .cc-btn-back {
     background: #fff;
     color: #475569;
     border: 1px solid #e2e8f0;
+    padding: 10px 12px;
+    flex-shrink: 0;
   }
 
   .cc-btn-primary {
     background: linear-gradient(135deg, #4f46e5, #6366f1);
     color: #fff;
   }
-  .cc-btn-primary:hover { box-shadow: 0 4px 16px rgba(79,70,229,0.4); }
 
   .cc-btn-success {
     background: linear-gradient(135deg, #10b981, #059669);
     color: #fff;
+    width: 100%;
   }
-  .cc-btn-success:hover { box-shadow: 0 4px 16px rgba(16,185,129,0.35); }
 
   .cc-btn-warn {
     background: linear-gradient(135deg, #f97316, #ea580c);
     color: #fff;
+    width: 100%;
+    padding: 14px 20px;
+    font-size: 15px;
   }
-  .cc-btn-warn:hover { box-shadow: 0 4px 16px rgba(249,115,22,0.35); }
 
   .cc-btn-sm {
-    padding: 6px 12px;
-    font-size: 12px;
+    padding: 8px 12px;
+    font-size: 13px;
     border-radius: 8px;
   }
 
@@ -115,27 +123,27 @@ const styles = `
   .cc-upload-card {
     background: #fff;
     border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    padding: 20px;
-    margin-bottom: 24px;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 16px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
 
   .cc-form {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
   }
 
   .cc-textarea {
     width: 100%;
-    padding: 14px 16px;
+    padding: 12px 14px;
     border: 1.5px solid #e2e8f0;
     border-radius: 12px;
-    font-size: 14px;
+    font-size: 15px;
     font-family: inherit;
     resize: vertical;
-    min-height: 90px;
+    min-height: 88px;
     transition: border-color 0.2s, box-shadow 0.2s;
     outline: none;
     background: #f8fafc;
@@ -149,16 +157,16 @@ const styles = `
 
   .cc-form-row {
     display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    align-items: center;
+    flex-direction: column;
+    gap: 10px;
   }
 
   .cc-input {
-    padding: 11px 14px;
+    width: 100%;
+    padding: 12px 14px;
     border: 1.5px solid #e2e8f0;
     border-radius: 10px;
-    font-size: 14px;
+    font-size: 15px;
     font-family: inherit;
     background: #fff;
     transition: border-color 0.2s, box-shadow 0.2s;
@@ -172,157 +180,193 @@ const styles = `
 
   .cc-filter-bar {
     display: flex;
-    gap: 14px;
-    align-items: center;
+    flex-direction: column;
+    gap: 12px;
     background: #fff;
     border: 1px solid #e2e8f0;
-    padding: 14px 18px;
-    border-radius: 12px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
+    padding: 14px;
+    border-radius: 14px;
+    margin-bottom: 16px;
     font-size: 13px;
     color: #475569;
     box-shadow: 0 1px 3px rgba(0,0,0,0.03);
   }
 
+  .cc-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
   .cc-filter-bar input[type="date"],
   .cc-filter-bar input[type="number"] {
-    padding: 8px 12px;
+    padding: 10px 12px;
     border: 1.5px solid #e2e8f0;
     border-radius: 8px;
-    font-size: 13px;
+    font-size: 14px;
     font-family: inherit;
     background: #f8fafc;
+    min-height: 42px;
+  }
+
+  .cc-filter-bar input[type="date"] {
+    flex: 1;
+    min-width: 0;
   }
 
   .cc-filter-bar input[type="number"] {
-    width: 56px;
+    width: 64px;
     text-align: center;
   }
 
   .cc-check-label {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     font-weight: 600;
     color: #5b21b6;
     cursor: pointer;
     user-select: none;
+    padding: 4px 0;
   }
 
   .cc-check-label input {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     accent-color: #7c3aed;
     cursor: pointer;
   }
 
-  .cc-table-wrap {
+  .cc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .cc-code-card {
     background: #fff;
     border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    overflow: hidden;
+    border-radius: 14px;
+    padding: 16px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: border-color 0.15s;
   }
 
-  .cc-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-
-  .cc-table thead {
-    background: linear-gradient(180deg, #f1f5f9, #e2e8f0);
-  }
-
-  .cc-table th {
-    padding: 14px 12px;
-    text-align: left;
-    font-weight: 600;
-    color: #475569;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    white-space: nowrap;
-  }
-
-  .cc-table td {
-    padding: 12px;
-    border-top: 1px solid #f1f5f9;
-    vertical-align: middle;
-  }
-
-  .cc-table tbody tr {
-    transition: background 0.15s;
-  }
-
-  .cc-table tbody tr:hover {
-    background: #f8fafc;
-  }
-
-  .cc-table tbody tr.hidden-row {
-    opacity: 0.5;
+  .cc-code-card.hidden-card {
+    opacity: 0.55;
     background: #fafafa;
+  }
+
+  .cc-code-main {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
   }
 
   .cc-code {
     font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    font-weight: 600;
-    font-size: 13px;
+    font-weight: 700;
+    font-size: 16px;
     color: #0d9488;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.03em;
+    word-break: break-all;
+    line-height: 1.4;
   }
 
-  .cc-code.muted {
-    color: #94a3b8;
-  }
-
-  .cc-report {
-    font-weight: 600;
-  }
-  .cc-report.warn { color: #ef4444; }
-  .cc-report.ok { color: #94a3b8; }
+  .cc-code.muted { color: #94a3b8; }
 
   .cc-status {
     font-size: 12px;
     font-weight: 600;
     padding: 4px 10px;
     border-radius: 999px;
-    display: inline-block;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
-  .cc-status.available {
-    background: #d1fae5;
-    color: #065f46;
-  }
-  .cc-status.used {
-    background: #fee2e2;
-    color: #991b1b;
-  }
-  .cc-status.reported {
-    background: #fef3c7;
-    color: #92400e;
+  .cc-status.available { background: #d1fae5; color: #065f46; }
+  .cc-status.used { background: #fee2e2; color: #991b1b; }
+  .cc-status.reported { background: #fef3c7; color: #92400e; }
+
+  .cc-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 12px;
+    line-height: 1.5;
   }
 
-  .cc-table input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
+  .cc-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .cc-report-count.warn { color: #ef4444; font-weight: 600; }
+  .cc-report-count.ok { color: #94a3b8; }
+
+  .cc-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+  }
+
+  .cc-action-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+    cursor: pointer;
+    user-select: none;
+    padding: 6px 10px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    min-height: 40px;
+  }
+
+  .cc-action-item input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
     accent-color: #6366f1;
     cursor: pointer;
+    flex-shrink: 0;
   }
 
-  .cc-table input[type="checkbox"]:disabled {
+  .cc-action-item input[type="checkbox"]:disabled {
     cursor: not-allowed;
-    opacity: 0.5;
+    opacity: 0.45;
+  }
+
+  .cc-action-item.disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .cc-admin-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
   }
 
   .cc-inline-input {
-    padding: 6px 10px;
+    width: 100%;
+    padding: 10px 12px;
     border: 1.5px solid #c7d2fe;
     border-radius: 8px;
-    font-size: 13px;
+    font-size: 15px;
     font-family: inherit;
-    width: 100%;
-    max-width: 180px;
+    margin-bottom: 8px;
   }
 
   .cc-empty {
@@ -330,12 +374,15 @@ const styles = `
     text-align: center;
     color: #94a3b8;
     font-size: 14px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
   }
 
   .cc-submit-bar {
-    margin-top: 24px;
-    display: flex;
-    justify-content: flex-end;
+    margin-top: 20px;
+    position: sticky;
+    bottom: 16px;
   }
 
   .cc-loading {
@@ -343,6 +390,14 @@ const styles = `
     text-align: center;
     color: #64748b;
     font-size: 15px;
+  }
+
+  .cc-secret {
+    font-size: 13px;
+    color: #475569;
+    background: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 6px;
   }
 `;
 
@@ -379,7 +434,8 @@ export default function CategoryDetailPage({ categoryId, onNavigateBack }) {
         .map(c => ({
           ...c,
           isUsed: cache[c.code] === 'used',
-          isReported: cache[c.code] === 'reported',
+          // 過期檢舉一律不預設勾選
+          isReported: false,
           localHiddenReason: cache[c.code] || null
         }))
         .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -470,8 +526,6 @@ export default function CategoryDetailPage({ categoryId, onNavigateBack }) {
     );
   }
 
-  const colSpan = isAdmin ? 9 : 8;
-
   return (
     <div className="cc-detail">
       <style>{styles}</style>
@@ -482,10 +536,9 @@ export default function CategoryDetailPage({ categoryId, onNavigateBack }) {
 
       <div className="cc-topbar">
         <button className="cc-btn cc-btn-back" onClick={onNavigateBack}>
-          ⬅️ 返回大廳
+          ⬅️
         </button>
         <h2>【{currentCategory.name}】</h2>
-        <div style={{ width: 100 }} />
       </div>
 
       <div className="cc-upload-card">
@@ -493,7 +546,7 @@ export default function CategoryDetailPage({ categoryId, onNavigateBack }) {
           <textarea
             className="cc-textarea"
             rows={3}
-            placeholder="請在此貼上雜亂文字，系統會自動智慧分割兌換碼..."
+            placeholder="貼上雜亂文字，自動智慧分割兌換碼..."
             value={bulkInput}
             onChange={e => setBulkInput(e.target.value)}
           />
@@ -505,7 +558,6 @@ export default function CategoryDetailPage({ categoryId, onNavigateBack }) {
                 placeholder="共同密碼"
                 value={singleSecret}
                 onChange={e => setSingleSecret(e.target.value)}
-                style={{ minWidth: 140 }}
               />
             )}
             <input
@@ -514,7 +566,6 @@ export default function CategoryDetailPage({ categoryId, onNavigateBack }) {
               placeholder="提交人名稱"
               value={contributorInput}
               onChange={e => setContributorInput(e.target.value)}
-              style={{ minWidth: 140 }}
             />
             <button type="submit" className="cc-btn cc-btn-success">
               ⚡ 智慧分割上架
@@ -524,19 +575,21 @@ export default function CategoryDetailPage({ categoryId, onNavigateBack }) {
       </div>
 
       <div className="cc-filter-bar">
-        <span>📅 日期：</span>
-        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-        <span>至</span>
-        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
-        <span style={{ marginLeft: 8 }}>|</span>
-        <span>隱藏檢舉 ≧</span>
-        <input
-          type="number"
-          value={reportThreshold}
-          onChange={e => setReportThreshold(parseInt(e.target.value) || 0)}
-        />
-        <span>次</span>
-        <span style={{ marginLeft: 8 }}>|</span>
+        <div className="cc-filter-row">
+          <span>📅</span>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+          <span>至</span>
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+        </div>
+        <div className="cc-filter-row">
+          <span>隱藏檢舉 ≧</span>
+          <input
+            type="number"
+            value={reportThreshold}
+            onChange={e => setReportThreshold(parseInt(e.target.value) || 0)}
+          />
+          <span>次</span>
+        </div>
         <label className="cc-check-label">
           <input
             type="checkbox"
@@ -547,143 +600,140 @@ export default function CategoryDetailPage({ categoryId, onNavigateBack }) {
         </label>
       </div>
 
-      <div className="cc-table-wrap">
-        <table className="cc-table">
-          <thead>
-            <tr>
-              <th>分割提取兌換碼</th>
-              {currentCategory.show_secret_key && <th>密碼</th>}
-              <th>提交人</th>
-              <th>提交日期</th>
-              <th>被檢舉</th>
-              <th>目前狀態</th>
-              <th>已使用 (複製)</th>
-              <th>過期檢舉</th>
-              {isAdmin && <th>🛠️ 操作</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {codes.length === 0 ? (
-              <tr>
-                <td colSpan={colSpan} className="cc-empty">
-                  暫無代碼
-                </td>
-              </tr>
-            ) : (
-              codes.map((item, index) => {
-                const isEdit = editingId === item.id;
-                return (
-                  <tr key={item.id} className={item.localHiddenReason ? 'hidden-row' : ''}>
-                    <td>
-                      {isEdit ? (
-                        <input
-                          className="cc-inline-input"
-                          type="text"
-                          value={editFields.code}
-                          onChange={e => setEditFields({ ...editFields, code: e.target.value })}
-                        />
-                      ) : (
-                        <span className={`cc-code ${item.localHiddenReason ? 'muted' : ''}`}>
-                          {item.code}
-                        </span>
-                      )}
-                    </td>
+      {codes.length === 0 ? (
+        <div className="cc-empty">暫無代碼</div>
+      ) : (
+        <div className="cc-list">
+          {codes.map((item, index) => {
+            const isEdit = editingId === item.id;
+            return (
+              <div
+                key={item.id}
+                className={`cc-code-card ${item.localHiddenReason ? 'hidden-card' : ''}`}
+              >
+                {isEdit ? (
+                  <>
+                    <input
+                      className="cc-inline-input"
+                      type="text"
+                      value={editFields.code}
+                      onChange={e => setEditFields({ ...editFields, code: e.target.value })}
+                      placeholder="兌換碼"
+                    />
                     {currentCategory.show_secret_key && (
-                      <td>
-                        {isEdit ? (
-                          <input
-                            className="cc-inline-input"
-                            type="text"
-                            value={editFields.secret_key}
-                            onChange={e => setEditFields({ ...editFields, secret_key: e.target.value })}
-                          />
-                        ) : (
-                          item.secret_key || '無'
-                        )}
-                      </td>
+                      <input
+                        className="cc-inline-input"
+                        type="text"
+                        value={editFields.secret_key}
+                        onChange={e => setEditFields({ ...editFields, secret_key: e.target.value })}
+                        placeholder="密碼"
+                      />
                     )}
-                    <td>{item.contributor || '匿名訪客'}</td>
-                    <td style={{ whiteSpace: 'nowrap', color: '#64748b' }}>
-                      {new Date(item.created_at).toLocaleString(navigator.language, { hour12: false })}
-                    </td>
-                    <td>
-                      <span className={`cc-report ${item.report_count > 0 ? 'warn' : 'ok'}`}>
-                        ⚠️ {item.report_count} 次
+                    <div className="cc-admin-row">
+                      <button className="cc-btn cc-btn-sm cc-btn-primary" onClick={() => saveInlineEdit(item.id)}>
+                        儲存
+                      </button>
+                      <button className="cc-btn cc-btn-sm cc-btn-ghost" onClick={() => setEditingId(null)}>
+                        取消
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="cc-code-main">
+                      <span className={`cc-code ${item.localHiddenReason ? 'muted' : ''}`}>
+                        {item.code}
                       </span>
-                    </td>
-                    <td>
                       {item.localHiddenReason ? (
                         item.localHiddenReason === 'used' ? (
-                          <span className="cc-status used">🚫 本地已領取</span>
+                          <span className="cc-status used">🚫 已領取</span>
                         ) : (
-                          <span className="cc-status reported">⚠️ 已提報檢舉</span>
+                          <span className="cc-status reported">⚠️ 已檢舉</span>
                         )
                       ) : (
-                        <span className="cc-status available">🟢 可用中</span>
+                        <span className="cc-status available">🟢 可用</span>
                       )}
-                    </td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={item.isUsed}
-                        disabled={item.localHiddenReason === 'used'}
-                        onChange={() => handleCheckboxChange(index, 'isUsed', item.code)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={item.isReported}
-                        disabled={item.localHiddenReason === 'reported'}
-                        onChange={() => handleCheckboxChange(index, 'isReported', item.code)}
-                      />
-                    </td>
+                    </div>
+
+                    <div className="cc-meta">
+                      {currentCategory.show_secret_key && (
+                        <span>
+                          🔑 <span className="cc-secret">{item.secret_key || '無'}</span>
+                        </span>
+                      )}
+                      <span>👤 {item.contributor || '匿名訪客'}</span>
+                      <span>
+                        📅 {new Date(item.created_at).toLocaleString(navigator.language, {
+                          hour12: false,
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                      <span className={`cc-report-count ${item.report_count > 0 ? 'warn' : 'ok'}`}>
+                        ⚠️ {item.report_count} 次
+                      </span>
+                    </div>
+
+                    <div className="cc-actions">
+                      <label
+                        className={`cc-action-item ${item.localHiddenReason === 'used' ? 'disabled' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.isUsed}
+                          disabled={item.localHiddenReason === 'used'}
+                          onChange={() => handleCheckboxChange(index, 'isUsed', item.code)}
+                        />
+                        已使用（複製）
+                      </label>
+                      <label
+                        className={`cc-action-item ${item.localHiddenReason === 'reported' ? 'disabled' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.isReported}
+                          disabled={item.localHiddenReason === 'reported'}
+                          onChange={() => handleCheckboxChange(index, 'isReported', item.code)}
+                        />
+                        過期檢舉
+                      </label>
+                    </div>
+
                     {isAdmin && (
-                      <td>
-                        {isEdit ? (
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="cc-btn cc-btn-sm cc-btn-primary" onClick={() => saveInlineEdit(item.id)}>
-                              儲存
-                            </button>
-                            <button className="cc-btn cc-btn-sm cc-btn-ghost" onClick={() => setEditingId(null)}>
-                              取消
-                            </button>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <button
-                              className="cc-btn cc-btn-sm"
-                              style={{ background: '#f59e0b', color: '#fff' }}
-                              onClick={() => {
-                                setEditingId(item.id);
-                                setEditFields({ code: item.code, secret_key: item.secret_key || '' });
-                              }}
-                            >
-                              編輯
-                            </button>
-                            <button
-                              className="cc-btn cc-btn-sm"
-                              style={{ background: '#ef4444', color: '#fff' }}
-                              onClick={async () => {
-                                if (window.confirm('確定刪除？')) {
-                                  await supabase.from('codes').delete().eq('id', item.id);
-                                  loadData();
-                                }
-                              }}
-                            >
-                              刪除
-                            </button>
-                          </div>
-                        )}
-                      </td>
+                      <div className="cc-admin-row">
+                        <button
+                          className="cc-btn cc-btn-sm"
+                          style={{ background: '#f59e0b', color: '#fff' }}
+                          onClick={() => {
+                            setEditingId(item.id);
+                            setEditFields({ code: item.code, secret_key: item.secret_key || '' });
+                          }}
+                        >
+                          編輯
+                        </button>
+                        <button
+                          className="cc-btn cc-btn-sm"
+                          style={{ background: '#ef4444', color: '#fff' }}
+                          onClick={async () => {
+                            if (window.confirm('確定刪除？')) {
+                              await supabase.from('codes').delete().eq('id', item.id);
+                              loadData();
+                            }
+                          }}
+                        >
+                          刪除
+                        </button>
+                      </div>
                     )}
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {codes.length > 0 && (
         <div className="cc-submit-bar">

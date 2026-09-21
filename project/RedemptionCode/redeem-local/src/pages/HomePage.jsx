@@ -8,9 +8,9 @@ const styles = `
 
   .cc-home {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    max-width: 960px;
+    max-width: 720px;
     margin: 0 auto;
-    padding: 28px 20px 60px;
+    padding: 16px 14px 60px;
     color: #0f172a;
     background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
     min-height: 100vh;
@@ -18,10 +18,10 @@ const styles = `
 
   .cc-toast {
     position: fixed;
-    top: 24px;
+    top: 16px;
     left: 50%;
     transform: translateX(-50%);
-    padding: 14px 28px;
+    padding: 12px 20px;
     border-radius: 12px;
     color: #fff;
     font-weight: 500;
@@ -29,6 +29,8 @@ const styles = `
     z-index: 9999;
     box-shadow: 0 10px 40px rgba(0,0,0,0.15);
     animation: slideDown 0.3s ease;
+    max-width: calc(100vw - 32px);
+    text-align: center;
   }
   .cc-toast.success { background: linear-gradient(135deg, #10b981, #059669); }
   .cc-toast.error { background: linear-gradient(135deg, #ef4444, #dc2626); }
@@ -40,16 +42,21 @@ const styles = `
 
   .cc-header {
     display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .cc-header-top {
+    display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 36px;
-    gap: 16px;
-    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 12px;
   }
 
   .cc-header h1 {
-    margin: 0 0 6px 0;
-    font-size: 28px;
+    margin: 0 0 4px 0;
+    font-size: 24px;
     font-weight: 700;
     letter-spacing: -0.03em;
     background: linear-gradient(135deg, #4f46e5, #7c3aed);
@@ -61,24 +68,28 @@ const styles = `
   .cc-header p {
     margin: 0;
     color: #64748b;
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .cc-user-bar {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
+    flex-shrink: 0;
   }
 
   .cc-user-name {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     color: #475569;
     background: #fff;
-    padding: 8px 14px;
+    padding: 8px 12px;
     border-radius: 999px;
     border: 1px solid #e2e8f0;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .cc-btn {
@@ -86,7 +97,7 @@ const styles = `
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 10px 18px;
+    padding: 10px 16px;
     border: none;
     border-radius: 10px;
     font-size: 14px;
@@ -94,22 +105,20 @@ const styles = `
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .cc-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
-  .cc-btn:active { transform: translateY(0); }
+  .cc-btn:active { transform: scale(0.97); }
 
   .cc-btn-primary {
     background: linear-gradient(135deg, #4f46e5, #6366f1);
     color: #fff;
   }
-  .cc-btn-primary:hover { box-shadow: 0 4px 16px rgba(79,70,229,0.4); }
 
   .cc-btn-danger {
     background: linear-gradient(135deg, #ef4444, #dc2626);
     color: #fff;
   }
-  .cc-btn-danger:hover { box-shadow: 0 4px 16px rgba(239,68,68,0.35); }
 
   .cc-btn-ghost {
     background: #fff;
@@ -118,43 +127,37 @@ const styles = `
   }
 
   .cc-btn-sm {
-    padding: 6px 12px;
-    font-size: 12px;
+    padding: 8px 12px;
+    font-size: 13px;
     border-radius: 8px;
   }
 
   .cc-admin-panel {
     background: linear-gradient(145deg, #f5f3ff, #ede9fe);
     border: 1.5px solid #c4b5fd;
-    border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 36px;
-    box-shadow: 0 4px 20px rgba(99,102,241,0.08);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 24px;
   }
 
   .cc-admin-panel h3 {
-    margin: 0 0 20px 0;
-    font-size: 18px;
+    margin: 0 0 16px 0;
+    font-size: 16px;
     font-weight: 700;
     color: #5b21b6;
-    display: flex;
-    align-items: center;
-    gap: 8px;
   }
 
-  .cc-admin-grid {
-    display: grid;
-    gap: 24px;
-    grid-template-columns: 1fr 1fr;
+  .cc-admin-section {
+    margin-bottom: 20px;
   }
 
-  @media (max-width: 720px) {
-    .cc-admin-grid { grid-template-columns: 1fr; }
+  .cc-admin-section:last-child {
+    margin-bottom: 0;
   }
 
-  .cc-admin-grid h4 {
-    margin: 0 0 12px 0;
-    font-size: 14px;
+  .cc-admin-section h4 {
+    margin: 0 0 10px 0;
+    font-size: 13px;
     font-weight: 600;
     color: #4c1d95;
   }
@@ -167,13 +170,12 @@ const styles = `
 
   .cc-input {
     width: 100%;
-    padding: 11px 14px;
+    padding: 12px 14px;
     border: 1.5px solid #e2e8f0;
     border-radius: 10px;
-    font-size: 14px;
+    font-size: 15px;
     font-family: inherit;
     background: #fff;
-    transition: border-color 0.2s, box-shadow 0.2s;
     outline: none;
   }
 
@@ -193,15 +195,15 @@ const styles = `
   }
 
   .cc-check-label input {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     accent-color: #6366f1;
     cursor: pointer;
   }
 
   .cc-rules-box {
     background: #fff;
-    padding: 12px 14px;
+    padding: 12px;
     border-radius: 10px;
     border: 1px solid #e2e8f0;
   }
@@ -214,14 +216,17 @@ const styles = `
   }
 
   .cc-rules-box .cc-check-label {
-    margin-right: 14px;
-    margin-bottom: 4px;
+    margin-right: 12px;
+    margin-bottom: 6px;
   }
 
   .cc-form-actions {
     display: flex;
-    gap: 10px;
-    margin-top: 4px;
+    gap: 8px;
+  }
+
+  .cc-form-actions .cc-btn {
+    flex: 1;
   }
 
   .cc-cleanup-label {
@@ -235,7 +240,7 @@ const styles = `
 
   .cc-cleanup-label input {
     width: 64px;
-    padding: 8px 10px;
+    padding: 10px;
     border: 1.5px solid #e2e8f0;
     border-radius: 8px;
     font-size: 14px;
@@ -244,33 +249,34 @@ const styles = `
   }
 
   .cc-category-grid {
-    display: grid;
-    gap: 18px;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
   .cc-card {
     background: #fff;
     border: 1px solid #e2e8f0;
     border-radius: 14px;
-    padding: 22px;
+    padding: 18px;
     cursor: pointer;
     position: relative;
-    transition: all 0.25s ease;
+    transition: border-color 0.2s, box-shadow 0.2s;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .cc-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 28px rgba(0,0,0,0.08);
+  .cc-card:active {
     border-color: #c7d2fe;
+    box-shadow: 0 4px 12px rgba(99,102,241,0.12);
   }
 
   .cc-card h3 {
-    margin: 0 0 12px 0;
+    margin: 0 0 10px 0;
     font-size: 17px;
     font-weight: 600;
     color: #1e293b;
+    padding-right: 70px;
   }
 
   .cc-card-meta {
@@ -279,37 +285,23 @@ const styles = `
     line-height: 1.6;
   }
 
-  .cc-card-meta div {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
   .cc-card-actions {
     position: absolute;
     top: 14px;
     right: 14px;
     display: flex;
     gap: 6px;
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-
-  .cc-card:hover .cc-card-actions {
-    opacity: 1;
   }
 
   .cc-btn-edit {
     background: #f59e0b;
     color: #fff;
   }
-  .cc-btn-edit:hover { box-shadow: 0 4px 12px rgba(245,158,11,0.35); }
 
   .cc-btn-delete {
     background: #ef4444;
     color: #fff;
   }
-  .cc-btn-delete:hover { box-shadow: 0 4px 12px rgba(239,68,68,0.35); }
 `;
 
 export default function HomePage({ onSelectCategory }) {
@@ -403,110 +395,110 @@ export default function HomePage({ onSelectCategory }) {
       )}
 
       <header className="cc-header">
-        <div>
-          <h1>兌換碼大廳</h1>
-          <p>請選擇欲查看或批次發行的項目種類</p>
-        </div>
-        <div className="cc-user-bar">
-          {userName ? (
-            <>
-              <span className="cc-user-name">👤 {userName}</span>
-              <button className="cc-btn cc-btn-danger" onClick={handleLogout}>登出</button>
-            </>
-          ) : (
-            <button className="cc-btn cc-btn-primary" onClick={handleGoogleLogin}>
-              Google 帳號登入
-            </button>
-          )}
+        <div className="cc-header-top">
+          <div>
+            <h1>兌換碼大廳</h1>
+            <p>選擇欲查看或批次發行的種類</p>
+          </div>
+          <div className="cc-user-bar">
+            {userName ? (
+              <>
+                <span className="cc-user-name">👤 {userName}</span>
+                <button className="cc-btn cc-btn-danger cc-btn-sm" onClick={handleLogout}>登出</button>
+              </>
+            ) : (
+              <button className="cc-btn cc-btn-primary cc-btn-sm" onClick={handleGoogleLogin}>
+                Google 登入
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
       {isAdmin && (
         <section className="cc-admin-panel">
           <h3>🛠️ 管理者控製面板</h3>
-          <div className="cc-admin-grid">
-            <div>
-              <h4>{editingCat ? '修改種類屬性與過濾分割規則' : '新增兌換種類與設定規則'}</h4>
-              <form className="cc-form" onSubmit={handleSaveCategory}>
+
+          <div className="cc-admin-section">
+            <h4>{editingCat ? '修改種類屬性與過濾規則' : '新增兌換種類與設定規則'}</h4>
+            <form className="cc-form" onSubmit={handleSaveCategory}>
+              <input
+                className="cc-input"
+                type="text"
+                placeholder="種類名稱"
+                value={catForm.name}
+                onChange={e => setCatForm({ ...catForm, name: e.target.value })}
+              />
+              <label className="cc-check-label">
                 <input
-                  className="cc-input"
-                  type="text"
-                  placeholder="種類名稱"
-                  value={catForm.name}
-                  onChange={e => setCatForm({ ...catForm, name: e.target.value })}
+                  type="checkbox"
+                  checked={catForm.showSecretKey}
+                  onChange={e => setCatForm({ ...catForm, showSecretKey: e.target.checked })}
                 />
-                <label className="cc-check-label">
-                  <input
-                    type="checkbox"
-                    checked={catForm.showSecretKey}
-                    onChange={e => setCatForm({ ...catForm, showSecretKey: e.target.checked })}
-                  />
-                  顯示密碼欄位
-                </label>
-
-                <div className="cc-rules-box">
-                  <p>⚙️ 批次分割自動過濾規則（多選）</p>
-                  <label className="cc-check-label">
-                    <input type="checkbox" checked={catForm.keepLetters} onChange={e => setCatForm({ ...catForm, keepLetters: e.target.checked })} />
-                    保留英文
-                  </label>
-                  <label className="cc-check-label">
-                    <input type="checkbox" checked={catForm.keepNumbers} onChange={e => setCatForm({ ...catForm, keepNumbers: e.target.checked })} />
-                    保留數字
-                  </label>
-                  <br />
-                  <label className="cc-check-label">
-                    <input type="checkbox" checked={catForm.keepSymbols} onChange={e => setCatForm({ ...catForm, keepSymbols: e.target.checked })} />
-                    保留符號
-                  </label>
-                  <label className="cc-check-label">
-                    <input type="checkbox" checked={catForm.forceUppercase} onChange={e => setCatForm({ ...catForm, forceUppercase: e.target.checked })} />
-                    強制大寫
-                  </label>
-                </div>
-
-                <div className="cc-form-actions">
-                  <button type="submit" className="cc-btn cc-btn-primary" style={{ flex: 1 }}>
-                    {editingCat ? '儲存變更' : '建立種類'}
-                  </button>
-                  {editingCat && (
-                    <button
-                      type="button"
-                      className="cc-btn cc-btn-ghost"
-                      onClick={() => {
-                        setEditingCat(null);
-                        setCatForm({ name: '', showSecretKey: false, keepLetters: true, keepNumbers: true, keepSymbols: false, forceUppercase: true });
-                      }}
-                    >
-                      取消
-                    </button>
-                  )}
-                </div>
-              </form>
-            </div>
-
-            <div>
-              <h4>🧹 凌晨 03:00 自動打鎖參數</h4>
-              <label className="cc-cleanup-label">
-                檢舉被黑達
-                <input
-                  type="number"
-                  value={cleanupSettings.cleanup_report_threshold}
-                  onChange={e => setCleanupSettings({ cleanup_report_threshold: e.target.value })}
-                />
-                次自動徹底灰飛煙滅
+                顯示密碼欄位
               </label>
-              <button
-                className="cc-btn"
-                style={{ background: 'linear-gradient(135deg, #ec4899, #db2777)', color: '#fff', marginTop: 14 }}
-                onClick={() => {
-                  CryptoCodeService.updateCleanupRules(cleanupSettings.cleanup_report_threshold);
-                  triggerStatus('清理規則已更新');
-                }}
-              >
-                儲存清理規則
-              </button>
-            </div>
+
+              <div className="cc-rules-box">
+                <p>⚙️ 批次分割過濾規則</p>
+                <label className="cc-check-label">
+                  <input type="checkbox" checked={catForm.keepLetters} onChange={e => setCatForm({ ...catForm, keepLetters: e.target.checked })} />
+                  英文
+                </label>
+                <label className="cc-check-label">
+                  <input type="checkbox" checked={catForm.keepNumbers} onChange={e => setCatForm({ ...catForm, keepNumbers: e.target.checked })} />
+                  數字
+                </label>
+                <label className="cc-check-label">
+                  <input type="checkbox" checked={catForm.keepSymbols} onChange={e => setCatForm({ ...catForm, keepSymbols: e.target.checked })} />
+                  符號
+                </label>
+                <label className="cc-check-label">
+                  <input type="checkbox" checked={catForm.forceUppercase} onChange={e => setCatForm({ ...catForm, forceUppercase: e.target.checked })} />
+                  強制大寫
+                </label>
+              </div>
+
+              <div className="cc-form-actions">
+                <button type="submit" className="cc-btn cc-btn-primary">
+                  {editingCat ? '儲存變更' : '建立種類'}
+                </button>
+                {editingCat && (
+                  <button
+                    type="button"
+                    className="cc-btn cc-btn-ghost"
+                    onClick={() => {
+                      setEditingCat(null);
+                      setCatForm({ name: '', showSecretKey: false, keepLetters: true, keepNumbers: true, keepSymbols: false, forceUppercase: true });
+                    }}
+                  >
+                    取消
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          <div className="cc-admin-section">
+            <h4>🧹 凌晨 03:00 自動清理</h4>
+            <label className="cc-cleanup-label">
+              檢舉達
+              <input
+                type="number"
+                value={cleanupSettings.cleanup_report_threshold}
+                onChange={e => setCleanupSettings({ cleanup_report_threshold: e.target.value })}
+              />
+              次自動刪除
+            </label>
+            <button
+              className="cc-btn"
+              style={{ background: 'linear-gradient(135deg, #ec4899, #db2777)', color: '#fff', marginTop: 12, width: '100%' }}
+              onClick={() => {
+                CryptoCodeService.updateCleanupRules(cleanupSettings.cleanup_report_threshold);
+                triggerStatus('清理規則已更新');
+              }}
+            >
+              儲存清理規則
+            </button>
           </div>
         </section>
       )}
