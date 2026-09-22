@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSystemStore } from '../../store/systemStore';
 import { useAuthStore } from '../../store/authStore';
-import { supabase } from '../../services/supabaseClient'; // ⚡ 引入原生客戶端進行即時查重
+import { supabase } from '../../services/supabaseClient'; // 引入原生客戶端進行即時查重
 
 export default function BulkUploadForm({ category, onUploaded }) {
   const [bulkInput, setBulkInput] = useState('');
@@ -19,8 +19,9 @@ export default function BulkUploadForm({ category, onUploaded }) {
     e.preventDefault();
     if (!bulkInput.trim()) return showToast('請貼上包含代碼的文字內容', 'error');
 
-    // 1. 依種類過濾規則建立動態正則表達式文字分割
+    // 1. 🛡️ 終極進化：動態將中文 Unicode 字元範圍補入過濾正則中，全面放行中文兌換碼！
     let rules = [
+      category.keep_chinese && '\\u4e00-\\u9fa5', // 精準捕捉繁簡中文字元範圍
       category.keep_letters && 'A-Za-z',
       category.keep_numbers && '0-9',
       category.keep_symbols && '\\-[_\\*\\!\\@\\#]'
@@ -30,6 +31,7 @@ export default function BulkUploadForm({ category, onUploaded }) {
     let rawMatches = [
       ...new Set(
         (bulkInput.match(new RegExp(matchPattern, 'g')) || [])
+          // 強制大寫僅對英文字母有效，中文字元會安全忽略保持原樣
           .map(c => (category.force_uppercase ? c.toUpperCase() : c))
           .filter(c => c.length >= 4)
       )
@@ -38,7 +40,7 @@ export default function BulkUploadForm({ category, onUploaded }) {
     if (!rawMatches.length) return showToast('未能分割出任何有效代碼(長度需>=4)', 'error');
 
     try {
-      // 2. 🛡️ 【前端一擊必殺防禦】直接向資料庫查詢該大類下已存在的序號
+      // 2. 🛡️ 【前端去重攔截】直接向資料庫查詢該大類下已存在的序號
       const { data: existingRecords, error: checkError } = await supabase
         .from('codes')
         .select('code')
@@ -47,16 +49,12 @@ export default function BulkUploadForm({ category, onUploaded }) {
 
       if (checkError) throw checkError;
 
-      // 提取已經存在於雲端的序號字串清單
       const existingCodes = new Set((existingRecords || []).map(r => r.code));
-
-      // 篩選出「真正全新、沒有重複」的乾淨序號陣列
       const uniqueNewCodes = rawMatches.filter(code => !existingCodes.has(code));
       const skippedCount = rawMatches.length - uniqueNewCodes.length;
 
-      // 3. 分流處理彈窗提示
+      // 3. 分流處理查重彈窗提示
       if (uniqueNewCodes.length === 0) {
-        // 如果全部都是重複的，直接就地攔截，完全不發送請求給後端
         showToast(`自動跳過 ${skippedCount} 組重複代碼，全新新增 0 組！`, 'error');
         setBulkInput('');
         setSingleSecret('');
@@ -71,7 +69,6 @@ export default function BulkUploadForm({ category, onUploaded }) {
         contributorName: contributor.trim()
       });
 
-      // 精確顯示提示
       if (skippedCount > 0) {
         showToast(`成功新增 ${uniqueNewCodes.length} 組，自動跳過 ${skippedCount} 組重複代碼！`);
       } else {

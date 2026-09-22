@@ -33,8 +33,13 @@ export const useSystemStore = create((set, get) => ({
 
   createCategory: async (payload) => {
     const { error } = await supabase.rpc('api_create_category', {
-      p_name: payload.name, p_show_secret: payload.showSecretKey, p_keep_letters: payload.keepLetters,
-      p_keep_numbers: payload.keepNumbers, p_keep_symbols: payload.keepSymbols, p_force_upper: payload.forceUppercase
+      p_name: payload.name, 
+      p_show_secret: payload.showSecretKey, 
+      p_keep_letters: payload.keepLetters,
+      p_keep_numbers: payload.keepNumbers, 
+      p_keep_symbols: payload.keepSymbols, 
+      p_force_upper: payload.forceUppercase,
+      p_keep_chinese: payload.keepChinese // ⚡ 支援中文儲存參數
     });
     if (error) throw error;
     await get().fetchCategories();
@@ -42,8 +47,14 @@ export const useSystemStore = create((set, get) => ({
 
   updateCategory: async (id, payload) => {
     const { error } = await supabase.rpc('api_update_category', {
-      p_id: id, p_name: payload.name, p_show_secret: payload.showSecretKey, p_keep_letters: payload.keepLetters,
-      p_keep_numbers: payload.keepNumbers, p_keep_symbols: payload.keepSymbols, p_force_upper: payload.forceUppercase
+      p_id: id, 
+      p_name: payload.name, 
+      p_show_secret: payload.showSecretKey, 
+      p_keep_letters: payload.keepLetters,
+      p_keep_numbers: payload.keepNumbers, 
+      p_keep_symbols: payload.keepSymbols, 
+      p_force_upper: payload.forceUppercase,
+      p_keep_chinese: payload.keepChinese // ⚡ 支援中文儲存參數
     });
     if (error) throw error;
     await get().fetchCategories();
@@ -83,7 +94,7 @@ export const useSystemStore = create((set, get) => ({
       p_contributor: payload.contributorName
     });
     if (error) throw error;
-    return data; // 精確回傳後端實際寫入成功的筆數
+    return data; // 精確回傳後端實際成功寫入的筆數
   },
 
   batchSubmitChanges: async (categoryId, items) => {
@@ -142,18 +153,26 @@ export const useSystemStore = create((set, get) => ({
   banUserEmail: async (email) => {
     const { error } = await supabase.from('banned_users').insert({ email });
     if (error) throw error;
-    await get().fetchBannedUsers(); // 封鎖成功後自動重新整理黑名單暫存
+    await get().fetchBannedUsers(); 
   },
 
   removeBanUserEmail: async (email) => {
     const { error } = await supabase.from('banned_users').delete().eq('email', email);
     if (error) throw error;
-    await get().fetchBannedUsers(); // 解除成功後自動重新整理黑名單暫存
+    await get().fetchBannedUsers(); 
   },
 
   deleteMessage: async (id) => {
     const { error } = await supabase.from('messages').delete().eq('id', id);
     if (error) throw error;
     await get().fetchMessages();
+  },
+
+  // 5. 開發者專用全域類別活躍度流量追蹤埋點
+  trackCategoryClick: async (categoryId) => {
+    const { error } = await supabase.rpc('api_track_category_click', {
+      p_category_id: categoryId
+    });
+    if (error) console.error("流量統計追蹤失敗:", error.message);
   }
 }));
