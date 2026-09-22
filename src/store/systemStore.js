@@ -5,7 +5,7 @@ export const useSystemStore = create((set, get) => ({
   categories: [],
   systemSettings: { cleanup_report_threshold: '20' },
   messages: [],
-  bannedEmails: [], // 儲存已被封鎖的黑名單 Email 清單
+  bannedEmails: [],
   toast: { show: false, message: '', type: 'success' },
 
   showToast: (message, type = 'success') => {
@@ -13,7 +13,6 @@ export const useSystemStore = create((set, get) => ({
     setTimeout(() => set({ toast: { show: false, message: '', type: 'success' } }), 3000);
   },
 
-  // 1. 複合式快取控制（綁定分類 ID 與序號文字，防刪除大類重建後序號誤遮蔽）
   CACHE_KEY: 'used_codes_pool_v3',
   getLocalCache: () => JSON.parse(localStorage.getItem(get().CACHE_KEY) || '{}'),
   
@@ -24,7 +23,6 @@ export const useSystemStore = create((set, get) => ({
     localStorage.setItem(get().CACHE_KEY, JSON.stringify(pool));
   },
 
-  // 2. 分類與全域設定 CRUD
   fetchCategories: async () => {
     const { data, error } = await supabase.from('categories').select('*').order('name');
     if (error) throw error;
@@ -39,7 +37,8 @@ export const useSystemStore = create((set, get) => ({
       p_keep_numbers: payload.keepNumbers, 
       p_keep_symbols: payload.keepSymbols, 
       p_force_upper: payload.forceUppercase,
-      p_keep_chinese: payload.keepChinese // ⚡ 支援中文儲存參數
+      p_keep_chinese: payload.keepChinese,
+      p_web_url: payload.webUrl // ⚡ 支援外部直兌網址
     });
     if (error) throw error;
     await get().fetchCategories();
@@ -54,7 +53,8 @@ export const useSystemStore = create((set, get) => ({
       p_keep_numbers: payload.keepNumbers, 
       p_keep_symbols: payload.keepSymbols, 
       p_force_upper: payload.forceUppercase,
-      p_keep_chinese: payload.keepChinese // ⚡ 支援中文儲存參數
+      p_keep_chinese: payload.keepChinese,
+      p_web_url: payload.webUrl // ⚡ 支援外部直兌網址
     });
     if (error) throw error;
     await get().fetchCategories();
@@ -79,7 +79,6 @@ export const useSystemStore = create((set, get) => ({
     set((state) => ({ systemSettings: { ...state.systemSettings, cleanup_report_threshold: threshold.toString() } }));
   },
 
-  // 3. 代碼資料操作
   fetchCodesOfCategory: async () => {
     const { data, error } = await supabase.from('codes').select('*');
     if (error) throw error;
@@ -94,7 +93,7 @@ export const useSystemStore = create((set, get) => ({
       p_contributor: payload.contributorName
     });
     if (error) throw error;
-    return data; // 精確回傳後端實際成功寫入的筆數
+    return data;
   },
 
   batchSubmitChanges: async (categoryId, items) => {
@@ -103,7 +102,6 @@ export const useSystemStore = create((set, get) => ({
 
     items.forEach(item => {
       const compositeKey = `${categoryId}_${item.code}`;
-      
       if (item.isReported) {
         if (localCache[compositeKey] !== 'reported') {
           get().saveToLocalCache(categoryId, item.code, 'reported');
@@ -120,12 +118,8 @@ export const useSystemStore = create((set, get) => ({
     }
   },
 
-  // 4. 大廳獨立留言板功能（含黑名單防禦、特赦擴充）
   fetchMessages: async () => {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('messages').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     set({ messages: data });
   },
@@ -139,12 +133,8 @@ export const useSystemStore = create((set, get) => ({
   createMessage: async (content, userName) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('請先登入帳號');
-    
     const { error } = await supabase.from('messages').insert({
-      user_id: user.id,
-      user_name: userName,
-      user_email: user.email, 
-      content: content.trim()
+      user_id: user.id, user_name: userName, user_email: user.email, content: content.trim()
     });
     if (error) throw error;
     await get().fetchMessages();
@@ -168,11 +158,8 @@ export const useSystemStore = create((set, get) => ({
     await get().fetchMessages();
   },
 
-  // 5. 開發者專用全域類別活躍度流量追蹤埋點
   trackCategoryClick: async (categoryId) => {
-    const { error } = await supabase.rpc('api_track_category_click', {
-      p_category_id: categoryId
-    });
+    const { error } = await supabase.rpc('api_track_category_click', { p_category_id: categoryId });
     if (error) console.error("流量統計追蹤失敗:", error.message);
   }
 }));
