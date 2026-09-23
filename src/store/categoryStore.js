@@ -3,7 +3,7 @@ import { supabase } from '../services/supabaseClient';
 
 export const useCategoryStore = create((set, get) => ({
   categories: [],
-  systemSettings: { cleanup_report_threshold: '20' },
+  systemSettings: { cleanup_report_threshold: '10', cleanup_report_time: '00:00' },
 
   fetchCategories: async () => {
     const { data, error } = await supabase.from('categories').select('*').order('name');
@@ -58,17 +58,29 @@ export const useCategoryStore = create((set, get) => ({
     set({ systemSettings: settings });
   },
 
-  updateCleanupRules: async (threshold) => {
-    const { error } = await supabase.rpc('api_update_system_settings', {
+  updateCleanupRules: async (threshold, timePoint = '00:00') => {
+    const normalizedThreshold = Math.max(1, Number(threshold) || 10).toString();
+    const normalizedTime = timePoint || '00:00';
+
+    const { error: thresholdError } = await supabase.rpc('api_update_system_settings', {
       p_key: 'cleanup_report_threshold',
-      p_value: threshold.toString(),
+      p_value: normalizedThreshold,
     });
 
-    if (error) throw error;
+    if (thresholdError) throw thresholdError;
+
+    const { error: timeError } = await supabase.rpc('api_update_system_settings', {
+      p_key: 'cleanup_report_time',
+      p_value: normalizedTime,
+    });
+
+    if (timeError) throw timeError;
+
     set((state) => ({
       systemSettings: {
         ...state.systemSettings,
-        cleanup_report_threshold: threshold.toString(),
+        cleanup_report_threshold: normalizedThreshold,
+        cleanup_report_time: normalizedTime,
       },
     }));
   },

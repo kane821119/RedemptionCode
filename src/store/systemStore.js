@@ -4,7 +4,7 @@ import { getLocaleText } from '../i18n/languageStore';
 
 export const useSystemStore = create((set, get) => ({
   categories: [],
-  systemSettings: { cleanup_report_threshold: '20' },
+  systemSettings: { cleanup_report_threshold: '10' },
   messages: [],
   bannedEmails: [],
   toast: { show: false, message: '', type: 'success' },
@@ -91,14 +91,16 @@ export const useSystemStore = create((set, get) => ({
       p_category_id: payload.categoryId,
       p_codes: payload.codesArray,
       p_secrets: payload.secretsArray,
-      p_contributor: payload.contributorName
+      p_contributor: payload.contributorName,
+      p_notes: payload.notesArray || new Array(payload.codesArray.length).fill(null)
     });
     if (error) throw error;
     return data;
   },
 
   batchSubmitChanges: async (categoryId, items) => {
-    const reportedIds = [];
+    const reportedIds = new Set();
+    const claimedIds = new Set();
     const localCache = get().getLocalCache();
 
     items.forEach(item => {
@@ -106,15 +108,21 @@ export const useSystemStore = create((set, get) => ({
       if (item.isReported) {
         if (localCache[compositeKey] !== 'reported') {
           get().saveToLocalCache(categoryId, item.code, 'reported');
-          reportedIds.push(item.id);
+          reportedIds.add(item.id);
         }
       } else if (item.isUsed && localCache[compositeKey] !== 'used') {
         get().saveToLocalCache(categoryId, item.code, 'used');
+        claimedIds.add(item.id);
       }
     });
 
-    if (reportedIds.length > 0) {
-      const { error } = await supabase.rpc('batch_report_codes', { code_ids: reportedIds });
+    if (claimedIds.size > 0) {
+      const { error } = await supabase.rpc('batch_claim_codes', { code_ids: [...claimedIds] });
+      if (error) throw error;
+    }
+
+    if (reportedIds.size > 0) {
+      const { error } = await supabase.rpc('batch_report_codes', { code_ids: [...reportedIds] });
       if (error) throw error;
     }
   },

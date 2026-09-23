@@ -1,12 +1,14 @@
 # 兌換碼集散廳 | Universal Redemption Code Hub
 
-一個專為行動端高頻操作設計的兌換碼分享與管理系統。使用者可以瀏覽分類、複製兌換碼、標記已使用、回報過期、按讚與參與交流區；管理者則可管理分類、兌換碼、留言與黑名單。
+一個專為行動端高頻操作設計的兌換碼分享與管理系統。使用者可以瀏覽分類、發行兌換碼、為每筆資料補上備註、標記已使用、回報過期、查看貢獻者榜與參與交流區；管理者則可管理分類、兌換碼、留言與黑名單。
 
 目前版本的核心行為：
 
 * 兌換碼依 `created_at` 由新到舊排序，提交狀態不會改變順序。
 * 「標記使用」與「回報過期」為每筆兌換碼互斥的 radio button，預設不選取。
-* 操作會先保存到瀏覽器快取；按下提交且後端成功後，該兌換碼才會暫時隱藏並鎖定操作。
+* 發行區的備註會寫入每筆兌換碼的 `note` 欄位，並在發行區與兌換碼卡片中維持一致的顯示順序。
+* 「標記使用」會累積 `claim_count`，而貢獻者榜是根據各貢獻者的兌換碼被領取次數總和排序。
+* 「標記使用」與「回報過期」會先保存到瀏覽器快取；按下提交且後端成功後，該兌換碼才會暫時隱藏並鎖定操作。
 * 不同分類的相同兌換碼名稱使用 `category_id + code` 分開記錄，不會互相影響。
 * 支援繁體中文、英文、日文與越南文，語系切換會立即更新畫面。
 
@@ -84,7 +86,8 @@ CREATE TABLE public.codes (
     code TEXT NOT NULL,
     secret_key TEXT DEFAULT NULL,
     contributor TEXT DEFAULT '匿名訪客'::text NOT NULL,
-    like_count INT DEFAULT 0 NOT NULL,             -- 兌換碼獲得的按讚數
+    note TEXT DEFAULT NULL,                        -- 兌換項目 / 備註說明
+    claim_count INT DEFAULT 0 NOT NULL,            -- 已領取計數
     report_count INT DEFAULT 0 NOT NULL,           -- 過期失效累計被檢舉次數
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     CONSTRAINT unique_category_code UNIQUE (category_id, code) -- 🛡️ 唯一性查重約束
@@ -98,7 +101,7 @@ CREATE POLICY "允許所有人上架新代碼" ON public.codes FOR INSERT WITH C
 CREATE POLICY "僅限管理者硬刪除代碼" ON public.codes FOR DELETE USING (public.is_admin());
 ```
 
-### 4. 大廳獨立留言與發言黑名單系統 (messages & banned_users)
+### 4. 交流留言與發言黑名單系統 (messages & banned_users)
 公共交流討論區與對應的黑名單阻斷系統。
 ```sql
 CREATE TABLE public.banned_users (
@@ -159,14 +162,19 @@ $$ LANGUAGE plpgsql;
 ### B. 智慧財產權與原子批次去重上架 (核心返回寫入筆數)
 ```sql
 CREATE OR REPLACE FUNCTION public.api_insert_codes_bulk(
-  p_category_id UUID, p_codes TEXT[], p_secrets TEXT[], p_contributor TEXT
+  p_category_id UUID, p_codes TEXT[], p_secrets TEXT[], p_contributor TEXT, p_notes TEXT[] DEFAULT NULL
 ) RETURNS INT SECURITY DEFINER AS $$
 DECLARE
-  i INT; inserted_count INT := 0; curr_rows INT;
+  i INT; inserted_count INT := 0; curr_rows INT; curr_note TEXT;
 BEGIN
   FOR i IN 1..array_length(p_codes, 1) LOOP
-    INSERT INTO public.codes (category_id, code, secret_key, contributor)
-    VALUES (p_category_id, p_codes[i], p_secrets[i], COALESCE(NULLIF(p_contributor, ''), '匿名訪客'))
+    curr_note := NULL;
+    IF p_notes IS NOT NULL AND i <= array_length(p_notes, 1) THEN
+      curr_note := p_notes[i];
+    END IF;
+
+    INSERT INTO public.codes (category_id, code, secret_key, contributor, note)
+    VALUES (p_category_id, p_codes[i], p_secrets[i], COALESCE(NULLIF(p_contributor, ''), '匿名訪客'), curr_note)
     ON CONFLICT (category_id, code) DO NOTHING;
     GET DIAGNOSTICS curr_rows = ROW_COUNT;
     inserted_count := inserted_count + curr_rows;
@@ -201,7 +209,24 @@ END;
 $$ LANGUAGE plpgsql;
 ```
 
-正式環境請依實際 RLS 與權限需求設定 `GRANT EXECUTE`，並確認函式的 `search_path`、呼叫者權限與管理規則符合部署政策。
+### E. 批次更新領取次數（claim_count）
+
+分類頁的提交流程會將本次已標記為已使用的兌換碼 `codes.id` 一次性送給 `batch_claim_codes`。此 RPC 會原子更新 `claim_count`，避免前端多次重複提交造成計數錯誤：
+
+```sql
+CREATE OR REPLACE FUNCTION public.batch_claim_codes(code_ids UUID[])
+RETURNS VOID SECURITY DEFINER AS $$
+BEGIN
+  UPDATE public.codes
+  SET claim_count = claim_count + 1
+  WHERE id = ANY(code_ids);
+END;
+$$ LANGUAGE plpgsql;
+
+GRANT EXECUTE ON FUNCTION public.batch_claim_codes(UUID[]) TO anon, authenticated;
+```
+
+此設計讓前端在大量標記已使用時能保持一致的計數邏輯，也方便貢獻者榜直接依 `claim_count` 總和計算每位提交人的被領取次數。
 
 ---
 
@@ -226,7 +251,7 @@ $$ LANGUAGE plpgsql;
 1. 待提交操作：radio 點選後立即寫入 `code_action_history_v1`，重新整理後仍保留，但兌換碼不會消失。
 2. 已提交操作：提交成功後寫入 `used_codes_pool_v3`，兌換碼會暫時隱藏；開啟「顯示已遮蔽項目」後可查看，且已提交 radio 會鎖定。
 
-提交是批次流程。只有 `batchSubmitChanges()` 成功完成後，前端才會套用隱藏狀態；回報過期的 `report_count` 也會在成功提交後立即更新，不重新抓取資料，因此不會改變既有排序。
+提交是批次流程，只處理「標記使用」與「回報過期」。只有 `batchSubmitChanges()` 成功完成後，前端才會套用隱藏狀態；回報過期的 `report_count` 也會在成功提交後立即更新，不重新抓取資料，因此不會改變既有排序。貢獻者榜則依各人提交碼的 `claim_count` 總和計算，沒有獨立的按讚機制。
 
 ### 瀏覽器快取
 
@@ -236,13 +261,12 @@ $$ LANGUAGE plpgsql;
 | --- | --- |
 | `used_codes_pool_v3` | 已提交的使用/檢舉狀態 |
 | `code_action_history_v1` | 待提交與曾操作過的狀態 |
-| `liked_codes_v1` | 此瀏覽器對兌換碼的按讚紀錄 |
 | `show_hidden_items_v1` | 顯示已遮蔽項目的開關 |
-| `report_threshold_v1` | 隱藏檢舉門檻數字 |
+| `report_threshold_v1` | 隱藏檢舉門檻數字，預設為 `10` |
 | `category_favorites_v2` | 收藏分類 |
 | `only_show_favorites_switch_v2` | 僅顯示收藏的開關 |
 
-不同分類的相同兌換碼會使用不同的組合 key，例如 `${category_id}_ABC123`，因此不會共用標記使用或回報狀態。按讚則以 `codes.id` 作為 key。
+不同分類的相同兌換碼會使用不同的組合 key，例如 `${category_id}_ABC123`，因此不會共用標記使用或回報狀態。此版本不再使用按讚快取，貢獻者榜改由 `claim_count` 總和計算。
 
 ## 🔐 安全與部署注意事項
 

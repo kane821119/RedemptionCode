@@ -57,7 +57,7 @@ export default function GlobalHeader() {
               {showChat && (
                 <button
                   onClick={() => navigate('/lobby')}
-                  className="px-2.5 py-2 text-[10px] font-bold bg-white text-slate-600 border border-slate-200 rounded-xl shadow-sm"
+                  className="px-3 py-2 text-[10px] font-bold bg-white text-slate-700 border border-slate-200 rounded-xl shadow-sm"
                 >
                   {t('navChat')}
                 </button>

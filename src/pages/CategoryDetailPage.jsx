@@ -15,7 +15,7 @@ import { translations } from '../i18n/translations';
 export default function CategoryDetailPage() {
   const { routeKey } = useParams();
   const navigate = useNavigate();
-  const { categories, systemSettings } = useCategoryStore();
+  const { categories, systemSettings, fetchCategories } = useCategoryStore();
   const { fetchCodesOfCategory, batchSubmitChanges, saveToLocalCache } = useCodePoolStore();
   const isAdmin = useAuthStore((state) => state.isAdmin);
   const showToast = useToastStore((state) => state.showToast);
@@ -36,14 +36,13 @@ export default function CategoryDetailPage() {
     return `${today.getFullYear()}-${month}-${day}`;
   });
 
-  const [threshold, setThreshold] = useState(() => readStorage(CACHE_KEYS.reportThreshold, 20));
+  const [threshold, setThreshold] = useState(() => {
+    const storedThreshold = readStorage(CACHE_KEYS.reportThreshold, null);
+    const fallbackThreshold = Number(storedThreshold ?? 10);
+    return Number.isFinite(fallbackThreshold) && fallbackThreshold > 0 ? fallbackThreshold : 10;
+  });
   const [showHidden, setShowHidden] = useState(() => readStorage(CACHE_KEYS.showHiddenItems, false));
   const [pendingHiddenMap, setPendingHiddenMap] = useState({});
-  const [likedCodeMap, setLikedCodeMap] = useState(() => readStorage(CACHE_KEYS.likedCodes, {}));
-
-  useEffect(() => {
-    writeStorage(CACHE_KEYS.likedCodes, likedCodeMap);
-  }, [likedCodeMap]);
 
   useEffect(() => {
     writeStorage(CACHE_KEYS.actionHistory, localActions);
@@ -58,18 +57,32 @@ export default function CategoryDetailPage() {
   }, [threshold]);
 
   useEffect(() => {
+    if (!categories.length) {
+      fetchCategories().catch(() => {});
+      return;
+    }
+
     const cat = categories.find(c => c.id === categoryId);
     setCurrentCategory(cat);
-    if (readStorage(CACHE_KEYS.reportThreshold, null) === null && systemSettings.cleanup_report_threshold) {
-      setThreshold(parseInt(systemSettings.cleanup_report_threshold) || 20);
+
+    const dbThreshold = Number(systemSettings?.cleanup_report_threshold);
+    if (Number.isFinite(dbThreshold) && dbThreshold > 0) {
+      setThreshold(dbThreshold);
+      writeStorage(CACHE_KEYS.reportThreshold, dbThreshold);
+      return;
     }
-  }, [categoryId, categories, systemSettings]);
+
+    const storedThreshold = Number(readStorage(CACHE_KEYS.reportThreshold, 10));
+    setThreshold(Number.isFinite(storedThreshold) && storedThreshold > 0 ? storedThreshold : 10);
+  }, [categoryId, categories, systemSettings?.cleanup_report_threshold, fetchCategories]);
 
   useEffect(() => {
-    if (!categoryId && routeKey) {
+    if (!routeKey) return;
+    if (!categories.length) return;
+    if (!categoryId) {
       navigate('/home', { replace: true });
     }
-  }, [categoryId, routeKey, navigate]);
+  }, [categoryId, routeKey, categories, navigate]);
 
   const loadPoolData = async () => {
     try {
@@ -92,8 +105,13 @@ export default function CategoryDetailPage() {
       const submittedHiddenReason = hiddenCache[compositeKey] || null;
       const hiddenReason = submittedHiddenReason || localActionStatus || null;
       const isCommittedUsed = submittedHiddenReason === 'used';
+      const normalizedClaimCount = Number(item.claim_count ?? item.claimCount ?? 0);
+      const normalizedReportCount = Number(item.report_count ?? item.reportCount ?? 0);
+
       return {
         ...item,
+        claim_count: normalizedClaimCount,
+        report_count: normalizedReportCount,
         isUsed: isCommittedUsed || localActionStatus === 'used',
         _uiReported: localActionStatus === 'reported' || submittedHiddenReason === 'reported',
         localHiddenReason: hiddenReason,
@@ -139,30 +157,6 @@ export default function CategoryDetailPage() {
       else delete next[actionKey];
       return next;
     });
-
-    if (!isChecked || !likedCodeMap[item.id]) return;
-
-    const nextLikeCount = Math.max(0, Number(item.like_count || 0) - 1);
-    setLikedCodeMap(prev => {
-      const next = { ...prev };
-      delete next[item.id];
-      return next;
-    });
-    setRawCodes(prev => prev.map(code => code.id === item.id ? { ...code, like_count: nextLikeCount } : code));
-
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session) return;
-
-      const { error } = await supabase
-        .from('codes')
-        .update({ like_count: nextLikeCount })
-        .eq('id', item.id);
-
-      if (error) throw error;
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
   };
 
   const anonymousGuestNames = new Set(
@@ -179,13 +173,16 @@ export default function CategoryDetailPage() {
 
   const getDisplayContributor = (value = '') => {
     const trimmed = String(value || '').trim();
-    return trimmed || t('anonymousGuest');
+    if (!trimmed || anonymousGuestNames.has(trimmed)) {
+      return t('anonymousGuest');
+    }
+    return trimmed;
   };
 
   const getItemStatus = (item) => {
+    if (item.localHiddenReason === 'reported') return { label: t('statusReported'), tone: 'bg-rose-50 text-rose-700' };
     if (Number(item.report_count || 0) > 0) return { label: t('statusUnknown'), tone: 'bg-amber-50 text-amber-700' };
     if (item.localHiddenReason === 'used') return { label: t('statusUsed'), tone: 'bg-amber-50 text-amber-700' };
-    if (item.localHiddenReason === 'reported') return { label: t('statusReported'), tone: 'bg-rose-50 text-rose-700' };
     return { label: t('statusAvailable'), tone: 'bg-blue-50 text-blue-700' };
   };
 
@@ -198,53 +195,16 @@ export default function CategoryDetailPage() {
 
       const key = contributorName.toLowerCase();
       if (!grouped[key]) {
-        grouped[key] = { name: contributorName, likes: 0 };
+        grouped[key] = { name: contributorName, claimedTotal: 0 };
       }
 
-      grouped[key].likes += Number(item.like_count || 0);
+      grouped[key].claimedTotal += Number(item.claim_count || 0);
     });
 
     return Object.values(grouped)
-      .sort((a, b) => b.likes - a.likes)
+      .sort((a, b) => b.claimedTotal - a.claimedTotal)
       .slice(0, 6);
   }, [rawCodes]);
-
-  const handleLikeCode = async (item) => {
-    const alreadyLiked = !!likedCodeMap[item.id];
-    const currentLikeCount = Number(item.like_count || 0);
-    const nextLikeCount = alreadyLiked ? Math.max(0, currentLikeCount - 1) : currentLikeCount + 1;
-
-    setLikedCodeMap((prev) => {
-      const next = { ...prev };
-      if (alreadyLiked) {
-        delete next[item.id];
-      } else {
-        next[item.id] = true;
-      }
-      return next;
-    });
-
-    setRawCodes((prev) => prev.map((code) => code.id === item.id ? { ...code, like_count: nextLikeCount } : code));
-
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session) return;
-
-      const { data, error } = await supabase
-        .from('codes')
-        .update({ like_count: nextLikeCount })
-        .eq('id', item.id)
-        .select('like_count')
-        .single();
-
-      if (error) throw error;
-
-      const savedLikeCount = Number(data?.like_count ?? nextLikeCount);
-      setRawCodes((prev) => prev.map((code) => code.id === item.id ? { ...code, like_count: savedLikeCount } : code));
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  };
 
   const handleDeleteCode = async (id, codeText) => {
     if (!confirmAction(`${t('deleteCodeConfirm')} 【${codeText}】`)) return;
@@ -258,11 +218,14 @@ export default function CategoryDetailPage() {
 
   const handleSyncSubmit = async () => {
     try {
-      const itemsToSubmit = processedCodes.map(c => ({
-        id: c.id, code: c.code,
-        isUsed: localActions[`${categoryId}_${c.code}`] === 'used',
-        isReported: localActions[`${categoryId}_${c.code}`] === 'reported'
-      })).filter(item => item.isUsed || item.isReported);
+      const itemsToSubmit = processedCodes
+        .filter(item => !item.hasSubmittedAction)
+        .map(c => ({
+          id: c.id, code: c.code,
+          isUsed: localActions[`${categoryId}_${c.code}`] === 'used',
+          isReported: localActions[`${categoryId}_${c.code}`] === 'reported'
+        }))
+        .filter(item => item.isUsed || item.isReported);
 
       if (itemsToSubmit.length === 0) {
         showToast(t('syncSuccess'));
@@ -270,24 +233,35 @@ export default function CategoryDetailPage() {
       }
 
       const nextHiddenMap = {};
+      const claimedCodes = new Set(itemsToSubmit.filter(item => item.isUsed).map(item => item.code));
+      const reportedCodes = new Set(itemsToSubmit.filter(item => item.isReported).map(item => item.code));
+
       itemsToSubmit.forEach((item) => {
         const compositeKey = `${categoryId}_${item.code}`;
         nextHiddenMap[compositeKey] = item.isReported ? 'reported' : 'used';
       });
 
       await batchSubmitChanges(categoryId, itemsToSubmit);
-      const reportedCodes = new Set(itemsToSubmit.filter(item => item.isReported).map(item => item.code));
-      if (reportedCodes.size > 0) {
-        setRawCodes(prev => prev.map(code => (
-          reportedCodes.has(code.code)
-            ? { ...code, report_count: Number(code.report_count || 0) + 1 }
-            : code
-        )));
-      }
+
+      setRawCodes(prev => prev.map(code => {
+        if (claimedCodes.has(code.code)) {
+          return { ...code, claim_count: Number(code.claim_count || 0) + 1 };
+        }
+        if (reportedCodes.has(code.code)) {
+          return { ...code, report_count: Number(code.report_count || 0) + 1 };
+        }
+        return code;
+      }));
+
       setPendingHiddenMap(prev => ({ ...prev, ...nextHiddenMap }));
       showToast(t('syncSuccess'));
     } catch (e) { showToast(e.message, 'error'); }
   };
+
+  const hasPendingSubmissions = processedCodes.some((item) => {
+    const action = localActions[`${categoryId}_${item.code}`];
+    return !item.hasSubmittedAction && (action === 'used' || action === 'reported');
+  });
 
   if (!currentCategory) return <div className="text-center py-10 text-slate-400 text-xs font-bold">{t('categoryLoading')}</div>;
   return (
@@ -300,7 +274,7 @@ export default function CategoryDetailPage() {
         <aside className="bg-white border border-slate-200/70 rounded-2xl p-3 shadow-sm min-w-0">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="text-[10px] font-black uppercase text-slate-500">{t('contributorsLeaderboard')}</h3>
-            <span className="text-[9px] font-bold text-slate-400">{t('likeCount')}</span>
+            <span className="text-[9px] font-bold text-slate-400">{t('claimedTotal')}</span>
           </div>
 
           <div className="space-y-2">
@@ -310,7 +284,7 @@ export default function CategoryDetailPage() {
               contributorLeaderboard.map((person) => (
                 <div key={person.name} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-2 py-1.5">
                   <span className="min-w-0 flex-1 truncate text-[10px] font-extrabold text-slate-700">{person.name}</span>
-                  <span className="text-[9px] font-black text-blue-600">{person.likes}</span>
+                  <span className="text-[9px] font-black text-blue-600">{person.claimedTotal}</span>
                 </div>
               ))
             )}
@@ -334,17 +308,6 @@ export default function CategoryDetailPage() {
                   {item.hasSubmittedAction && <span className="text-[9px] font-black px-2 py-0.5 rounded-md bg-slate-700 text-white">{t('submittedAction')}</span>}
                   {item.hasRecordedAction && !item.hasSubmittedAction && <span className="text-[9px] font-black px-2 py-0.5 rounded-md bg-amber-500 text-white">{t('pendingAction')}</span>}
                   <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${getItemStatus(item).tone}`}>{getItemStatus(item).label}</span>
-                  {!isAnonymousContributor(item.contributor) && !item._uiReported && (
-                    <button
-                      type="button"
-                      onClick={() => handleLikeCode(item)}
-                      className={`inline-flex items-center justify-center w-7 h-7 rounded-md border shadow-sm transition ${likedCodeMap[item.id] ? 'border-blue-200 bg-blue-100 text-blue-700 hover:border-blue-300' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:text-blue-600'}`}
-                      aria-label={likedCodeMap[item.id] ? t('liked') : t('like')}
-                      title={likedCodeMap[item.id] ? t('liked') : t('like')}
-                    >
-                      <span className="text-sm leading-none">{likedCodeMap[item.id] ? '👍' : '👍🏻'}</span>
-                    </button>
-                  )}
                   {isAdmin && <button onClick={() => handleDeleteCode(item.id, item.code)} className="inline-flex items-center justify-center w-7 h-7 text-[10px] bg-slate-50 text-rose-500 border border-slate-200 rounded-md shadow-sm font-bold">🗑️</button>}
                 </div>
               </div>
@@ -352,9 +315,21 @@ export default function CategoryDetailPage() {
               <div className="grid grid-cols-2 gap-y-1.5 text-[10px] text-slate-400 font-bold border-b border-slate-100 pb-2.5 mb-2.5 pl-1">
                 {currentCategory.show_secret_key && <div className="truncate">{t('keyLabel')} <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-mono font-black">{item.secret_key || t('none')}</span></div>}
                 <div className="truncate">{t('contributorLabel')} <span className="text-slate-600 font-extrabold">{getDisplayContributor(item.contributor)}</span></div>
-                <div className="truncate">{t('createdLabel')} <span className="text-slate-600 font-medium">{new Date(item.created_at).toLocaleString(locale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span></div>
-                <div className={`truncate ${item.report_count > 0 ? 'text-rose-500' : ''}`}>{t('reportCountLabel')} {item.report_count}</div>
+                 <div className="truncate">{t('createdLabel')} <span className="text-slate-600 font-medium">{new Date(item.created_at).toLocaleString(locale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span></div>
+                 <div className={`truncate ${Number(item.claim_count || 0) > 0 ? 'text-blue-500' : ''}`}>
+                   {t('claimCountLabel')} {Number(item.claim_count || 0)}
+                 </div>
+                 <div className={`truncate ${Number(item.report_count || 0) > 0 ? 'text-rose-500' : ''}`}>
+                   {t('reportCountLabel')} {Number(item.report_count || 0)}
+                 </div>
               </div>
+
+              {item.note && (
+                <div className="mb-2.5 pl-1 text-[10px] text-slate-600 font-bold opacity-80">
+                  <span className="mr-1">📝</span>
+                  {item.note}
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-bold text-slate-600 pl-1 select-none">
                 {currentCategory.web_url && !item.localHiddenReason && (
@@ -370,9 +345,11 @@ export default function CategoryDetailPage() {
         </div>
       )}
 
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100vw-32px)] max-w-md z-40 px-1">
-        <button onClick={handleSyncSubmit} className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black rounded-xl text-xs shadow-lg tracking-widest">{t('submit')}</button>
-      </div>
+      {hasPendingSubmissions && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100vw-32px)] max-w-md z-40 px-1">
+          <button onClick={handleSyncSubmit} className="w-1/2 mx-auto py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black rounded-xl text-xs shadow-lg tracking-widest">{t('submit')}</button>
+        </div>
+      )}
     </div>
   );
 }

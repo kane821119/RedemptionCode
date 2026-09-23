@@ -28,6 +28,7 @@ export const useCodePoolStore = create((set, get) => ({
       p_codes: payload.codesArray,
       p_secrets: payload.secretsArray,
       p_contributor: payload.contributorName,
+      p_notes: payload.notesArray || new Array(payload.codesArray.length).fill(null),
     });
 
     if (error) throw error;
@@ -35,7 +36,8 @@ export const useCodePoolStore = create((set, get) => ({
   },
 
   batchSubmitChanges: async (categoryId, items) => {
-    const reportedIds = [];
+    const reportedIds = new Set();
+    const claimedIds = new Set();
     const localCache = get().getLocalCache();
 
     items.forEach((item) => {
@@ -44,15 +46,21 @@ export const useCodePoolStore = create((set, get) => ({
       if (item.isReported) {
         localCache[compositeKey] = 'reported';
         get().saveToLocalCache(categoryId, item.code, 'reported');
-        reportedIds.push(item.id);
+        reportedIds.add(item.id);
       } else if (item.isUsed) {
         localCache[compositeKey] = 'used';
         get().saveToLocalCache(categoryId, item.code, 'used');
+        claimedIds.add(item.id);
       }
     });
 
-    if (reportedIds.length > 0) {
-      const { error } = await supabase.rpc('batch_report_codes', { code_ids: reportedIds });
+    if (claimedIds.size > 0) {
+      const { error } = await supabase.rpc('batch_claim_codes', { code_ids: [...claimedIds] });
+      if (error) throw error;
+    }
+
+    if (reportedIds.size > 0) {
+      const { error } = await supabase.rpc('batch_report_codes', { code_ids: [...reportedIds] });
       if (error) throw error;
     }
   },

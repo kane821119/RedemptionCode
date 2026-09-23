@@ -25,7 +25,11 @@ export default function HomePage() {
   const showToast = useToastStore((state) => state.showToast);
   const t = useLanguageStore((state) => state.t);
   const { isAdmin } = useAuthStore();
-  const [cleanupThreshold, setCleanupThreshold] = useState('100');
+  const [cleanupThreshold, setCleanupThreshold] = useState(() => {
+    const dbValue = Number(systemSettings?.cleanup_report_threshold);
+    return Number.isFinite(dbValue) && dbValue > 0 ? String(dbValue) : '10';
+  });
+  const [cleanupTime, setCleanupTime] = useState(() => systemSettings?.cleanup_report_time || '00:00');
   const [editingCat, setEditingCat] = useState(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,6 +41,17 @@ export default function HomePage() {
     fetchCategories().catch((err) => showToast(`${t('loadCategoriesError')}: ${err.message}`, 'error'));
     fetchSystemSettings().catch(() => {});
   }, [fetchCategories, fetchSystemSettings, showToast, t]);
+
+  useEffect(() => {
+    const dbValue = Number(systemSettings?.cleanup_report_threshold);
+    if (Number.isFinite(dbValue) && dbValue > 0) {
+      setCleanupThreshold(String(dbValue));
+    }
+
+    if (systemSettings?.cleanup_report_time) {
+      setCleanupTime(systemSettings.cleanup_report_time);
+    }
+  }, [systemSettings?.cleanup_report_threshold, systemSettings?.cleanup_report_time]);
 
   const handleToggleSwitch = () => {
     const nextState = !onlyShowFavorites;
@@ -127,9 +142,17 @@ export default function HomePage() {
                   {editingCat && <button type="button" onClick={() => { setEditingCat(null); setCatForm({ name: '', showSecretKey: false, keepLetters: true, keepNumbers: true, keepSymbols: false, forceUppercase: true, keepChinese: false, webUrl: '' }); }} className="px-4 bg-slate-200 text-slate-600 font-bold rounded-xl text-xs">{t('cancel')}</button>}</div>
                 </form>
               </div>
-              <div className="bg-slate-50/60 p-4 rounded-xl border border-slate-200/50 text-xs pl-5">
-                <div className="flex items-center gap-2 flex-wrap text-slate-600 font-medium"><span>{t('cleanupLabel')}</span><input type="number" className="w-14 p-1 text-center bg-white border rounded-lg text-slate-800 font-bold" value={cleanupThreshold} onChange={e => setCleanupThreshold(e.target.value)} /><span>{t('cleanupSuffix')}</span></div>
-                <button onClick={() => { updateCleanupRules(cleanupThreshold); showToast(t('updateSuccess')); }} className="w-full mt-3 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl border">{t('saveScheduleRule')}</button>
+              <div className="bg-slate-50/60 p-4 rounded-xl border border-slate-200/50 text-xs pl-5 space-y-3">
+                <div className="flex items-center gap-2 flex-wrap text-slate-600 font-medium">
+                  <span>{t('cleanupLabel')}</span>
+                  <input type="number" min="1" className="w-14 p-1 text-center bg-white border rounded-lg text-slate-800 font-bold" value={cleanupThreshold} onChange={e => setCleanupThreshold(Math.max(1, Number(e.target.value) || 1))} />
+                  <span>{t('cleanupSuffix')}</span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap text-slate-600 font-medium">
+                  <span>{t('cleanupTimeLabel')}</span>
+                  <input type="time" className="px-2 py-1 bg-white border rounded-lg text-slate-800 font-bold" value={cleanupTime} onChange={e => setCleanupTime(e.target.value || '00:00')} />
+                </div>
+                <button onClick={() => { updateCleanupRules(cleanupThreshold, cleanupTime); showToast(t('updateSuccess')); }} className="w-full mt-1 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl border">{t('saveScheduleRule')}</button>
               </div>
             </section>
           )}

@@ -11,6 +11,7 @@ export default function BulkUploadForm({ category, onUploaded }) {
   const [bulkInput, setBulkInput] = useState('');
   const [singleSecret, setSingleSecret] = useState('');
   const [contributor, setContributor] = useState('');
+  const [noteText, setNoteText] = useState('');
   
   const userName = useAuthStore((state) => state.userName);
   const { insertCodesBulk } = useCodePoolStore();
@@ -61,11 +62,15 @@ export default function BulkUploadForm({ category, onUploaded }) {
       }
 
       // 4. 只將真正全新的乾淨序號送去後端上架
+      const normalizedNote = noteText.trim();
+      const notesArray = new Array(uniqueNewCodes.length).fill(normalizedNote || null);
+
       await insertCodesBulk({
         categoryId: category.id,
         codesArray: uniqueNewCodes,
         secretsArray: new Array(uniqueNewCodes.length).fill(singleSecretValue),
-        contributorName: contributorCheck.value
+        contributorName: contributorCheck.value,
+        notesArray
       });
 
       if (skippedCount > 0) {
@@ -76,6 +81,7 @@ export default function BulkUploadForm({ category, onUploaded }) {
 
       setBulkInput('');
       setSingleSecret('');
+      setNoteText('');
       onUploaded();
     } catch (err) {
       showToast(err.message, 'error');
@@ -105,9 +111,16 @@ export default function BulkUploadForm({ category, onUploaded }) {
               onChange={e => setSingleSecret(e.target.value)}
             />
           )}
+          <textarea
+            rows={2}
+            className="w-full md:col-span-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-500 focus:outline-none text-slate-800 placeholder-slate-400 resize-y"
+            placeholder={t('codeNotePlaceholder')}
+            value={noteText}
+            onChange={e => setNoteText(e.target.value)}
+          />
           <input
             type="text"
-            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-500 focus:outline-none text-slate-800 placeholder-slate-400"
+            className="w-full md:col-span-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-500 focus:outline-none text-slate-800 placeholder-slate-400"
             placeholder={t('contributorPlaceholder')}
             value={contributor}
             onChange={e => setContributor(e.target.value)}
