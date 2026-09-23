@@ -3,6 +3,7 @@ import { supabase } from '../services/supabaseClient';
 
 export const useCategoryStore = create((set, get) => ({
   categories: [],
+  announcements: [],
   systemSettings: { cleanup_report_threshold: '10', cleanup_report_time: '00:00' },
 
   fetchCategories: async () => {
@@ -55,7 +56,7 @@ export const useCategoryStore = create((set, get) => ({
     if (error) throw error;
 
     const settings = (data || []).reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
-    set({ systemSettings: settings });
+    set({ systemSettings: { cleanup_report_threshold: '10', cleanup_report_time: '00:00', announcement_text: '', ...settings } });
   },
 
   updateCleanupRules: async (threshold, timePoint = '00:00') => {
@@ -83,6 +84,43 @@ export const useCategoryStore = create((set, get) => ({
         cleanup_report_time: normalizedTime,
       },
     }));
+  },
+
+  fetchAnnouncements: async () => {
+    const { data, error } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    set({ announcements: data || [] });
+  },
+
+  createAnnouncement: async (content) => {
+    const normalizedText = String(content ?? '').trim();
+    if (!normalizedText) throw new Error('公告內容不能為空');
+
+    const { error } = await supabase.from('announcements').insert({
+      content: normalizedText,
+    });
+
+    if (error) throw error;
+    await get().fetchAnnouncements();
+  },
+
+  updateAnnouncement: async (id, content) => {
+    const normalizedText = String(content ?? '').trim();
+    if (!normalizedText) throw new Error('公告內容不能為空');
+
+    const { error } = await supabase.from('announcements').update({
+      content: normalizedText,
+      updated_at: new Date().toISOString(),
+    }).eq('id', id);
+
+    if (error) throw error;
+    await get().fetchAnnouncements();
+  },
+
+  deleteAnnouncement: async (id) => {
+    const { error } = await supabase.from('announcements').delete().eq('id', id);
+    if (error) throw error;
+    await get().fetchAnnouncements();
   },
 
   trackCategoryClick: async (categoryId) => {

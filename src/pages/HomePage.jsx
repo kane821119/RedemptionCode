@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
+import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCategoryStore } from '../store/categoryStore';
 import { useToastStore } from '../store/toastStore';
@@ -16,6 +16,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const {
     categories,
+    announcements,
     systemSettings,
     fetchCategories,
     createCategory,
@@ -23,6 +24,10 @@ export default function HomePage() {
     deleteCategory,
     fetchSystemSettings,
     updateCleanupRules,
+    fetchAnnouncements,
+    createAnnouncement,
+    updateAnnouncement,
+    deleteAnnouncement,
     trackCategoryClick,
   } = useCategoryStore();
   const showToast = useToastStore((state) => state.showToast);
@@ -33,6 +38,9 @@ export default function HomePage() {
     return Number.isFinite(dbValue) && dbValue > 0 ? String(dbValue) : '10';
   });
   const [cleanupTime, setCleanupTime] = useState(() => systemSettings?.cleanup_report_time || '00:00');
+  const [announcementDraft, setAnnouncementDraft] = useState('');
+  const cleanupThresholdValue = cleanupThreshold ?? (systemSettings?.cleanup_report_threshold ? String(systemSettings.cleanup_report_threshold) : '10');
+  const cleanupTimeValue = cleanupTime ?? systemSettings?.cleanup_report_time ?? '00:00';
   const [editingCat, setEditingCat] = useState(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,7 +51,8 @@ export default function HomePage() {
   useEffect(() => {
     fetchCategories().catch((err) => showToast(`${t('loadCategoriesError')}: ${err.message}`, 'error'));
     fetchSystemSettings().catch(() => {});
-  }, [fetchCategories, fetchSystemSettings, showToast, t]);
+    fetchAnnouncements().catch(() => {});
+  }, [fetchCategories, fetchSystemSettings, fetchAnnouncements, showToast, t]);
 
   useEffect(() => {
     const dbValue = Number(systemSettings?.cleanup_report_threshold);
@@ -55,6 +64,30 @@ export default function HomePage() {
       setCleanupTime(systemSettings.cleanup_report_time);
     }
   }, [systemSettings?.cleanup_report_threshold, systemSettings?.cleanup_report_time]);
+
+  const handleSaveAnnouncement = async () => {
+    const content = announcementDraft.trim();
+    if (!content) return showToast(t('announcementRequired'), 'error');
+
+    try {
+      await createAnnouncement(content);
+      setAnnouncementDraft('');
+      showToast(t('createSuccess'));
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id) => {
+    if (confirmAction(t('deleteAnnouncementConfirm'))) {
+      try {
+        await deleteAnnouncement(id);
+        showToast(t('deleteAnnouncementSuccess'));
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+  };
 
   const handleToggleSwitch = () => {
     const nextState = !onlyShowFavorites;
@@ -134,14 +167,69 @@ export default function HomePage() {
           catForm={catForm}
           setCatForm={setCatForm}
           handleSaveCategory={handleSaveCategory}
-          cleanupThreshold={cleanupThreshold}
+          cleanupThreshold={cleanupThresholdValue}
           setCleanupThreshold={setCleanupThreshold}
-          cleanupTime={cleanupTime}
+          cleanupTime={cleanupTimeValue}
           setCleanupTime={setCleanupTime}
           updateCleanupRules={updateCleanupRules}
           showToast={showToast}
         />
       </Suspense>
+
+      <div className="mb-4 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-3.5 shadow-sm">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">📢</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700">{t('announcement')}</span>
+          </div>
+          <span className="text-[9px] font-bold text-amber-700">{announcements.length} 則</span>
+        </div>
+
+        {isAdmin && (
+          <div className="mb-3 space-y-2">
+            <textarea
+              rows="3"
+              value={announcementDraft}
+              onChange={(e) => setAnnouncementDraft(e.target.value)}
+              className="w-full resize-none rounded-xl border border-amber-200 bg-white/80 p-2.5 text-xs text-slate-700 shadow-inner placeholder:text-slate-400 focus:border-amber-400 focus:outline-none"
+              placeholder={t('announcementPlaceholder')}
+            />
+            <button
+              type="button"
+              onClick={handleSaveAnnouncement}
+              className="w-full rounded-xl bg-amber-500 px-3 py-2 text-[10px] font-black text-white shadow-sm hover:bg-amber-400 transition-colors"
+            >
+              {t('createAnnouncement')}
+            </button>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {announcements.length === 0 ? (
+            <p className="text-xs leading-relaxed text-slate-600">{t('announcementEmpty')}</p>
+          ) : (
+            announcements.map((item) => (
+              <div key={item.id} className="rounded-xl border border-amber-200 bg-white/80 p-2.5">
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <span className="text-[9px] font-bold text-amber-700">
+                    {new Date(item.created_at).toLocaleString([], { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAnnouncement(item.id)}
+                      className="text-[9px] font-black text-rose-600 hover:text-rose-700"
+                    >
+                      {t('announcementDelete')}
+                    </button>
+                  )}
+                </div>
+                <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-700">{item.content}</p>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
       <div className="bg-white border border-slate-200/70 rounded-2xl p-3 shadow-sm mb-4 flex items-center gap-2.5">
         <span className="text-sm pl-1 text-slate-400">🔍</span>

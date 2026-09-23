@@ -1,4 +1,3 @@
-import React from 'react';
 import { useLanguageStore } from '../../i18n/languageStore';
 
 export default function CategoryAdminPanel({
@@ -10,13 +9,19 @@ export default function CategoryAdminPanel({
   catForm,
   setCatForm,
   handleSaveCategory,
-  handleEditClick,
-  onDeleteCategory,
   cleanupThreshold,
   setCleanupThreshold,
   cleanupTime,
   setCleanupTime,
   updateCleanupRules,
+  announcements,
+  announcementDraft,
+  setAnnouncementDraft,
+  editingAnnouncementId,
+  setEditingAnnouncementId,
+  handleSaveAnnouncement,
+  handleEditAnnouncement,
+  handleDeleteAnnouncement,
   showToast,
 }) {
   const t = useLanguageStore((state) => state.t);

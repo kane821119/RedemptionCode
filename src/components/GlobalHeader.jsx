@@ -69,10 +69,17 @@ export default function GlobalHeader() {
                 className="px-2 py-2 text-[10px] font-bold bg-white text-slate-700 border border-slate-200 rounded-xl shadow-sm outline-none"
                 aria-label={t('language')}
               >
-                <option value="zh-TW">{t('traditionalChinese')}</option>
+                <option value="de-DE">{t('german')}</option>
                 <option value="en-US">{t('english')}</option>
+                <option value="es-ES">{t('spanish')}</option>
+                <option value="fr-FR">{t('french')}</option>
                 <option value="ja-JP">{t('japanese')}</option>
+                <option value="ko-KR">{t('korean')}</option>
+                <option value="ru-RU">{t('russian')}</option>
+                <option value="th-TH">{t('thai')}</option>
                 <option value="vi-VN">{t('vietnamese')}</option>
+                <option value="zh-CN">{t('simplifiedChinese')}</option>
+                <option value="zh-TW">{t('traditionalChinese')}</option>
               </select>
 
               {userName ? (
