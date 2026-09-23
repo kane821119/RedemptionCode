@@ -71,6 +71,8 @@ export default function GlobalHeader() {
               >
                 <option value="zh-TW">{t('traditionalChinese')}</option>
                 <option value="en-US">{t('english')}</option>
+                <option value="ja-JP">{t('japanese')}</option>
+                <option value="vi-VN">{t('vietnamese')}</option>
               </select>
 
               {userName ? (
