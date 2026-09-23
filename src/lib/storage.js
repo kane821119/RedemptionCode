@@ -2,6 +2,10 @@ export const CACHE_KEYS = {
   usedCodes: 'used_codes_pool_v3',
   favorites: 'category_favorites_v2',
   favoritesSwitch: 'only_show_favorites_switch_v2',
+  likedCodes: 'liked_codes_v1',
+  showHiddenItems: 'show_hidden_items_v1',
+  actionHistory: 'code_action_history_v1',
+  reportThreshold: 'report_threshold_v1',
 };
 
 export const readStorage = (key, fallback = null) => {

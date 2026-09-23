@@ -5,7 +5,7 @@ import { CACHE_KEYS, readStorage, writeStorage } from '../lib/storage';
 export const useCodePoolStore = create((set, get) => ({
   codesByCategory: {},
 
-  getLocalCache: () => safeJsonParse(readStorage(CACHE_KEYS.usedCodes, {})),
+  getLocalCache: () => readStorage(CACHE_KEYS.usedCodes, {}),
 
   saveToLocalCache: (categoryId, code, statusType) => {
     const pool = get().getLocalCache();
@@ -14,7 +14,10 @@ export const useCodePoolStore = create((set, get) => ({
   },
 
   fetchCodesOfCategory: async () => {
-    const { data, error } = await supabase.from('codes').select('*');
+    const { data, error } = await supabase
+      .from('codes')
+      .select('*')
+      .order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
   },
@@ -39,11 +42,11 @@ export const useCodePoolStore = create((set, get) => ({
       const compositeKey = `${categoryId}_${item.code}`;
 
       if (item.isReported) {
-        if (localCache[compositeKey] !== 'reported') {
-          get().saveToLocalCache(categoryId, item.code, 'reported');
-          reportedIds.push(item.id);
-        }
-      } else if (item.isUsed && localCache[compositeKey] !== 'used') {
+        localCache[compositeKey] = 'reported';
+        get().saveToLocalCache(categoryId, item.code, 'reported');
+        reportedIds.push(item.id);
+      } else if (item.isUsed) {
+        localCache[compositeKey] = 'used';
         get().saveToLocalCache(categoryId, item.code, 'used');
       }
     });
@@ -54,15 +57,3 @@ export const useCodePoolStore = create((set, get) => ({
     }
   },
 }));
-
-function safeJsonParse(value, fallback = {}) {
-  if (value === null || value === undefined) {
-    return fallback;
-  }
-
-  try {
-    return JSON.parse(value) ?? fallback;
-  } catch (error) {
-    return fallback;
-  }
-}

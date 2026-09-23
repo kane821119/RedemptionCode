@@ -1,22 +1,32 @@
-# 代碼集散廳 | Universal Code Exchange Panel
+# 兌換碼集散廳 | Universal Redemption Code Hub
 
-一個專為行動端高頻觸控優化的極簡純白風格、Bento Grid 雙排卡片流兌換碼發行池管理系統。本專案前端 100% 基於 **React 生態系** 驅動，後端完全對接 **Supabase (PostgreSQL)** 進行原子數據增量、智慧型去重過濾與全自動發言黑名單防禦。
+一個專為行動端高頻操作設計的兌換碼分享與管理系統。使用者可以瀏覽分類、複製兌換碼、標記已使用、回報過期、按讚與參與交流區；管理者則可管理分類、兌換碼、留言與黑名單。
+
+目前版本的核心行為：
+
+* 兌換碼依 `created_at` 由新到舊排序，提交狀態不會改變順序。
+* 「標記使用」與「回報過期」為每筆兌換碼互斥的 radio button，預設不選取。
+* 操作會先保存到瀏覽器快取；按下提交且後端成功後，該兌換碼才會暫時隱藏並鎖定操作。
+* 不同分類的相同兌換碼名稱使用 `category_id + code` 分開記錄，不會互相影響。
+* 支援繁體中文、英文、日文與越南文，語系切換會立即更新畫面。
 
 ---
 
 ## 🛠️ 技術晶片堆疊 (Tech Stack)
 
-*   **前端框架**: React 18 (純 JSX 元件化結構)
+*   **前端框架**: React 19 (純 JSX 元件化結構)
 *   **建置工具**: Vite (極速熱更新編譯)
 *   **狀態管理**: Zustand (輕量化全域通訊與快取狀態)
 *   **視覺樣式**: Tailwind CSS v4 (純白冷色調、行動端單手防誤觸佈局)
-*   **後端雲端**: Supabase / PostgreSQL (OAuth 2.0、RLS 安全安全策略、RPC 預存程序)
+*   **後端雲端**: Supabase / PostgreSQL (Google OAuth、RLS 安全策略、RPC 預存程序)
+*   **路由**: React Router 7
+*   **驗證與狀態**: Supabase Auth、Zustand、瀏覽器 `localStorage`
 
 ---
 
 ## 💾 資料庫架構與底層設計 (Database Schema)
 
-本系統的後端依賴 4 張核心實體資料表。請在 Supabase 的 **SQL Editor** 中依次執行以下建置腳本：
+本系統的後端依賴 5 張核心實體資料表。請在 Supabase 的 **SQL Editor** 中依次執行以下建置腳本：
 
 ### 1. 管理員名單表 (admin_users)
 用於判定使用者是否具備全域管理最高特權（如建立大類、永久刪除代碼、執行發言封鎖）。
@@ -74,6 +84,7 @@ CREATE TABLE public.codes (
     code TEXT NOT NULL,
     secret_key TEXT DEFAULT NULL,
     contributor TEXT DEFAULT '匿名訪客'::text NOT NULL,
+    like_count INT DEFAULT 0 NOT NULL,             -- 兌換碼獲得的按讚數
     report_count INT DEFAULT 0 NOT NULL,           -- 過期失效累計被檢舉次數
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     CONSTRAINT unique_category_code UNIQUE (category_id, code) -- 🛡️ 唯一性查重約束
@@ -131,7 +142,7 @@ WITH CHECK (
 
 ## ⚡ 資料庫儲存程序與預存 RPC (Stored Procedures)
 
-系統前端高併發與業務解耦依賴以下四大 RPC 函數，請在 Supabase SQL Editor 中部署：
+系統前端高併發與業務解耦依賴以下 RPC 函數，請在 Supabase SQL Editor 中部署：
 
 ### A. 大類建立與更新維護 (對齊中文及網址)
 ```sql
@@ -175,7 +186,71 @@ END;
 $$ LANGUAGE plpgsql;
 ```
 
+### D. 批次回報過期兌換碼
+
+分類頁會在使用者按下提交後，將本批次選取的資料庫 `codes.id` 傳給 `batch_report_codes`。此 RPC 應以資料庫原子更新方式增加 `report_count`，並限制可被公開呼叫的權限，避免前端直接依任意欄位修改資料：
+
+```sql
+CREATE OR REPLACE FUNCTION public.batch_report_codes(code_ids UUID[])
+RETURNS VOID SECURITY DEFINER AS $$
+BEGIN
+  UPDATE public.codes
+  SET report_count = report_count + 1
+  WHERE id = ANY(code_ids);
+END;
+$$ LANGUAGE plpgsql;
+```
+
+正式環境請依實際 RLS 與權限需求設定 `GRANT EXECUTE`，並確認函式的 `search_path`、呼叫者權限與管理規則符合部署政策。
+
 ---
+
+## 🧭 前端架構與使用流程
+
+### 共用介面
+
+`src/App.jsx` 統一掛載 `GlobalHeader` 與路由。標題、返回按鈕、語系切換、Google 登入、登出與交流入口集中在共用 header，不由各頁面重複實作。
+
+主要路由如下：
+
+| 路徑 | 功能 |
+| --- | --- |
+| `/home` | 分類大廳、收藏與管理者控制中心 |
+| `/category/:routeKey` | 分類兌換碼列表、篩選、批次操作與貢獻者榜 |
+| `/lobby` | 交流留言板與管理者黑名單處理 |
+
+### 兌換碼操作狀態
+
+分類頁將狀態分成兩層：
+
+1. 待提交操作：radio 點選後立即寫入 `code_action_history_v1`，重新整理後仍保留，但兌換碼不會消失。
+2. 已提交操作：提交成功後寫入 `used_codes_pool_v3`，兌換碼會暫時隱藏；開啟「顯示已遮蔽項目」後可查看，且已提交 radio 會鎖定。
+
+提交是批次流程。只有 `batchSubmitChanges()` 成功完成後，前端才會套用隱藏狀態；回報過期的 `report_count` 也會在成功提交後立即更新，不重新抓取資料，因此不會改變既有排序。
+
+### 瀏覽器快取
+
+快取只用於改善目前瀏覽器的操作體驗，不是跨裝置或跨使用者的資料庫。主要 key 如下：
+
+| Key | 用途 |
+| --- | --- |
+| `used_codes_pool_v3` | 已提交的使用/檢舉狀態 |
+| `code_action_history_v1` | 待提交與曾操作過的狀態 |
+| `liked_codes_v1` | 此瀏覽器對兌換碼的按讚紀錄 |
+| `show_hidden_items_v1` | 顯示已遮蔽項目的開關 |
+| `report_threshold_v1` | 隱藏檢舉門檻數字 |
+| `category_favorites_v2` | 收藏分類 |
+| `only_show_favorites_switch_v2` | 僅顯示收藏的開關 |
+
+不同分類的相同兌換碼會使用不同的組合 key，例如 `${category_id}_ABC123`，因此不會共用標記使用或回報狀態。按讚則以 `codes.id` 作為 key。
+
+## 🔐 安全與部署注意事項
+
+* 前端只能使用 Supabase `anon` key；`service_role` key 僅能放在受保護的後端或外部自動化環境，絕不能提交到 React 原始碼或公開環境變數。
+* Google OAuth 的 callback 網址必須加入 Supabase `Authentication > URL Configuration > Redirect URLs`。
+* RLS、管理者判定函式與管理者操作 policy 必須在 Supabase 正式環境啟用後再部署前端。
+* `localStorage` 不是安全邊界，不能用來存放密碼、token 或權限判定；它只記錄瀏覽器端的顯示與操作偏好。
+* `codes` 的唯一性應維持在 `(category_id, code)`，所以不同分類可使用相同兌換碼名稱，同一分類則由資料庫去重。
 
 ## 🔌 外部自動化程式 (如 Python 爬蟲) 接入規範
 

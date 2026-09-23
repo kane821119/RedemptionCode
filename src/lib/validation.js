@@ -50,7 +50,7 @@ export const validateWebUrl = (value) => {
 
 export const validateContributor = (value) => {
   const cleaned = sanitizeText(value, { maxLength: MAX_LENGTHS.contributor });
-  return { valid: true, value: cleaned || getLocaleText('anonymousGuest') };
+  return { valid: true, value: cleaned };
 };
 
 export const validateMessage = (value) => {
