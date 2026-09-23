@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabaseClient';
+import { getLocaleText } from '../i18n/languageStore';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -13,7 +14,7 @@ export const useAuthStore = create((set, get) => ({
     if (user) {
       const { data: isAdmin } = await supabase.rpc('is_admin');
       // 僅提取 full_name 作為顯示稱呼，絕不在前端儲存與展示 email 資訊
-      const name = user.user_metadata?.full_name || '已登入使用者';
+      const name = user.user_metadata?.full_name || getLocaleText('loggedInUser');
       set({ user, userName: name, isAdmin, loading: false });
     } else {
       set({ user: null, userName: null, isAdmin: false, loading: false });
@@ -23,7 +24,7 @@ export const useAuthStore = create((set, get) => ({
     supabase.auth.onAuthStateChange(async (_, session) => {
       if (session?.user) {
         const { data: isAdmin } = await supabase.rpc('is_admin');
-        const name = session.user.user_metadata?.full_name || '已登入使用者';
+        const name = session.user.user_metadata?.full_name || getLocaleText('loggedInUser');
         set({ user: session.user, userName: name, isAdmin });
       } else {
         set({ user: null, userName: null, isAdmin: false });

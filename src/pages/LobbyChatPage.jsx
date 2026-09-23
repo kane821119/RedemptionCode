@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSystemStore } from '../store/systemStore';
+import { useNavigate } from 'react-router-dom';
+import { useChatStore } from '../store/chatStore';
+import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
+import { validateMessage } from '../lib/validation';
+import { confirmAction } from '../lib/browser';
+import { useLanguageStore } from '../i18n/languageStore';
 
-export default function LobbyChatPage({ onNavigateBack }) {
-  const { messages, bannedEmails, fetchMessages, fetchBannedUsers, createMessage, banUserEmail, removeBanUserEmail, deleteMessage, showToast } = useSystemStore();
+export default function LobbyChatPage() {
+  const navigate = useNavigate();
+  const { messages, bannedEmails, fetchMessages, fetchBannedUsers, createMessage, banUserEmail, removeBanUserEmail, deleteMessage } = useChatStore();
+  const showToast = useToastStore((state) => state.showToast);
   const { userName, isAdmin, user: currentUser } = useAuthStore();
+  const t = useLanguageStore((state) => state.t);
   const [msgInput, setMsgInput] = useState('');
-  const [isBannedPanelOpen, setIsBannedPanelOpen] = useState(false); // ✨ 新增：控制黑名單面板折疊狀態
+  const [isBannedPanelOpen, setIsBannedPanelOpen] = useState(false);
 
   useEffect(() => {
     fetchMessages().catch(() => {});
@@ -20,72 +28,62 @@ export default function LobbyChatPage({ onNavigateBack }) {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!msgInput.trim()) return;
-    if (isCurrentUserBanned) return showToast('您的帳號已被禁止在大廳交流發言！', 'error');
-    
+    if (isCurrentUserBanned) return showToast(t('bannedUserMessage'), 'error');
+
+    const messageCheck = validateMessage(msgInput);
+    if (!messageCheck.valid) return showToast(messageCheck.error, 'error');
+
     try {
-      await createMessage(msgInput, userName);
-      showToast('留言成功發布！');
+      await createMessage(messageCheck.value, userName);
+      showToast(t('messageSuccess'));
       setMsgInput('');
     } catch (err) { showToast(err.message, 'error'); }
   };
 
   const handleBanUser = async (email, targetName) => {
-    if (!email) return showToast('無法取得該留言者的 Email 資訊', 'error');
-    if (window.confirm(`確定要永久封鎖使用者【${targetName}】(${email}) 嗎？封鎖後該帳號將再也無法進行大廳交流發言。`)) {
+    if (!email) return showToast(t('banAccountError'), 'error');
+    if (confirmAction(`${t('banUserConfirm')}【${targetName}】(${email})？`)) {
       try {
         await banUserEmail(email);
-        showToast(`已成功將 ${targetName} 移入永久黑名單！`);
+        showToast(t('banUserSuccess').replace('{name}', targetName));
       } catch (err) { showToast(err.message, 'error'); }
     }
   };
 
   const handleUnbanUser = async (email) => {
-    if (window.confirm(`確定要解除封鎖此帳號 (${email}) 嗎？恢復後他將重新獲得大廳發言權。`)) {
+    if (confirmAction(`${t('unbanUserConfirm')} (${email})？`)) {
       try {
         await removeBanUserEmail(email);
-        showToast('已成功移除黑名單，該帳號發言權已還原！');
+        showToast(t('unbanUserSuccess'));
       } catch (err) { showToast(err.message, 'error'); }
     }
   };
   return (
     <div className="max-w-md mx-auto px-4 py-6 pb-24 bg-slate-50 min-h-screen font-sans selection:bg-blue-500 selection:text-white">
-      
-      {/* 頂部 Header */}
-      <div className="flex items-center gap-3 mb-5">
-        <button onClick={onNavigateBack} className="p-3 bg-white border border-slate-200/70 rounded-xl font-bold shadow-sm active:scale-90 transition-all text-xs text-slate-700">
-          ⬅️
-        </button>
-        <div>
-          <h2 className="text-base font-black text-slate-900">大廳交流留言板</h2>
-          <p className="text-[10px] text-blue-600 font-bold tracking-wider mt-0.5 uppercase">LOBBY REALTIME CHAT</p>
-        </div>
-      </div>
-
       {/* 留言發布卡片 */}
       <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.01)] space-y-4 mb-4">
         {userName ? (
           isCurrentUserBanned ? (
             <div className="text-center p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-600">
-              🚫 您的帳號已被禁止在大廳交流發言與評論
+              {t('commentBlocked')}
             </div>
           ) : (
             <form onSubmit={handleSendMessage} className="flex gap-2">
               <input 
                 type="text" 
                 className="flex-1 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 focus:outline-none focus:bg-white focus:border-blue-500 text-slate-800 placeholder-slate-400"
-                placeholder={`以 ${userName} 身份留言討論...`}
+                placeholder={t('userMessagePlaceholder').replace('{name}', userName)}
                 value={msgInput}
                 onChange={e => setMsgInput(e.target.value)}
               />
               <button type="submit" className="px-4 py-3 bg-blue-600 text-white font-black rounded-xl text-xs hover:bg-blue-500 active:scale-95 transition-all shrink-0">
-                發布
+                {t('publish')}
               </button>
             </form>
           )
         ) : (
           <div className="text-center p-4 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-400 italic">
-            🔒 請先返回大廳並登入 Google 帳號，即可參與留言討論
+            {t('createMessagePrompt')}
           </div>
         )}
       </div>
@@ -102,11 +100,11 @@ export default function LobbyChatPage({ onNavigateBack }) {
             
             <span className="text-xs font-black text-slate-700 tracking-wider flex items-center gap-2 pl-1">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-              {isBannedPanelOpen ? '收起發言黑名單管理' : '展開發言黑名單管理'}
+              {isBannedPanelOpen ? t('adminManageToggleClose') : t('adminManageToggleOpen')}
             </span>
             <div className="flex items-center gap-2">
               <span className="text-[9px] bg-amber-50 text-amber-700 font-extrabold px-1.5 py-0.5 rounded border border-amber-200/40">
-                {bannedEmails.length} 人被封鎖
+                {t('bannedUsersCount').replace('{count}', bannedEmails.length)}
               </span>
               <span className="text-xs text-slate-400 font-bold">{isBannedPanelOpen ? '▲' : '▼'}</span>
             </div>
@@ -118,7 +116,7 @@ export default function LobbyChatPage({ onNavigateBack }) {
               
               <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-0.5 pl-1">
                 {bannedEmails.length === 0 ? (
-                  <div className="text-center py-4 text-[10px] font-bold text-slate-400 italic">目前沒有任何帳號被封鎖</div>
+                  <div className="text-center py-4 text-[10px] font-bold text-slate-400 italic">{t('noBannedUsers')}</div>
                 ) : (
                   bannedEmails.map((bannedEmail, index) => (
                     <div key={index} className="flex justify-between items-center p-2 bg-slate-50 border border-slate-200/50 rounded-xl gap-3">
@@ -129,7 +127,7 @@ export default function LobbyChatPage({ onNavigateBack }) {
                         onClick={() => handleUnbanUser(bannedEmail)}
                         className="text-[9px] font-black bg-white hover:bg-emerald-50 text-emerald-600 border border-slate-200 hover:border-emerald-200 px-2 py-1 rounded-lg shadow-sm transition active:scale-95 shrink-0"
                       >
-                        🔓 解除
+                        {t('unblock')}
                       </button>
                     </div>
                   ))
@@ -143,13 +141,13 @@ export default function LobbyChatPage({ onNavigateBack }) {
       {/* 留言歷史訊息串流 */}
       <div className="space-y-3">
         <div className="flex justify-between items-center px-0.5 mb-1">
-          <h2 className="text-xs font-black tracking-widest text-slate-400 uppercase">💬 歷史交流訊息</h2>
-          <span className="text-[9px] text-slate-400 font-bold">共 {messages.length} 則</span>
+          <h2 className="text-xs font-black tracking-widest text-slate-400 uppercase">{t('historyMessages')}</h2>
+          <span className="text-[9px] text-slate-400 font-bold">{t('historyFooter').replace('{count}', messages.length)}</span>
         </div>
 
         {messages.length === 0 ? (
           <div className="text-center py-12 bg-white border border-slate-200 rounded-2xl text-slate-400 text-xs italic">
-            目前尚無任何發言紀錄
+            {t('noMessages')}
           </div>
         ) : (
           messages.map(msg => {
@@ -163,7 +161,7 @@ export default function LobbyChatPage({ onNavigateBack }) {
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[11px] font-black text-slate-700">
                       👤 {msg.user_name}
-                      {isThisMsgUserBanned && <span className="text-[8px] bg-rose-100 text-rose-700 px-1 rounded ml-1">已封鎖</span>}
+                      {isThisMsgUserBanned && <span className="text-[8px] bg-rose-100 text-rose-700 px-1 rounded ml-1">{t('blockedBadge')}</span>}
                     </span>
                     
                     {isAdmin && msg.user_email && (
@@ -185,14 +183,14 @@ export default function LobbyChatPage({ onNavigateBack }) {
                         onClick={() => handleBanUser(msg.user_email, msg.user_name)}
                         className="text-[9px] font-bold bg-white text-amber-600 border border-slate-200 hover:bg-amber-50 px-1.5 py-0.5 rounded shadow-sm transition active:scale-90"
                       >
-                        🚫 封鎖
+                        {t('adminBanUser')}
                       </button>
                     )}
                     <button 
-                      onClick={async () => { if (window.confirm('確定要永久移除此條大廳發言嗎？')) { await deleteMessage(msg.id); showToast('留言已由管理員移除'); } }}
+                      onClick={async () => { if (confirmAction(t('deleteMessageConfirm'))) { await deleteMessage(msg.id); showToast(t('deleteMessageSuccess')); } }}
                       className="text-[9px] font-bold bg-white text-rose-500 border border-slate-200 hover:bg-rose-50 px-1.5 py-0.5 rounded shadow-sm transition active:scale-90"
                     >
-                      🗑️
+                      {t('adminDeleteMessage')}
                     </button>
                   </div>
                 )}

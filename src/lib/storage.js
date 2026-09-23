@@ -1,0 +1,36 @@
+export const CACHE_KEYS = {
+  usedCodes: 'used_codes_pool_v3',
+  favorites: 'category_favorites_v2',
+  favoritesSwitch: 'only_show_favorites_switch_v2',
+};
+
+export const readStorage = (key, fallback = null) => {
+  const rawValue = localStorage.getItem(key);
+
+  if (rawValue === null) {
+    return fallback;
+  }
+
+  try {
+    const parsedValue = JSON.parse(rawValue);
+    return parsedValue ?? fallback;
+  } catch (error) {
+    return fallback;
+  }
+};
+
+export const writeStorage = (key, value) => {
+  localStorage.setItem(key, JSON.stringify(value));
+};
+
+export const safeJsonParse = (value, fallback = {}) => {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(value) ?? fallback;
+  } catch (error) {
+    return fallback;
+  }
+};

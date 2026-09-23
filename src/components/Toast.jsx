@@ -1,8 +1,8 @@
 import React from 'react';
-import { useSystemStore } from '../store/systemStore';
+import { useToastStore } from '../store/toastStore';
 
 export default function Toast() {
-  const toast = useSystemStore((state) => state.toast);
+  const toast = useToastStore((state) => state.toast);
 
   if (!toast.show) return null;
 

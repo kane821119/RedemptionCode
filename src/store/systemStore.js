@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabaseClient';
+import { getLocaleText } from '../i18n/languageStore';
 
 export const useSystemStore = create((set, get) => ({
   categories: [],
@@ -132,7 +133,7 @@ export const useSystemStore = create((set, get) => ({
 
   createMessage: async (content, userName) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('請先登入帳號');
+    if (!user) throw new Error(getLocaleText('pleaseLoginFirst'));
     const { error } = await supabase.from('messages').insert({
       user_id: user.id, user_name: userName, user_email: user.email, content: content.trim()
     });
