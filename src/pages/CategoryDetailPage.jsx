@@ -6,7 +6,7 @@ import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
 import BulkUploadForm from '../features/pool/BulkUploadForm';
 import { supabase } from '../services/supabaseClient';
-import { CACHE_KEYS, readStorage, writeStorage } from '../lib/storage';
+import { CACHE_KEYS, readStorage, resolveReportThreshold, writeStorage } from '../lib/storage';
 import { resolveCategoryIdFromRoute } from '../lib/publicIds';
 import { copyTextToClipboard, confirmAction } from '../lib/browser';
 import { useLanguageStore } from '../i18n/languageStore';
@@ -15,7 +15,7 @@ import { translations } from '../i18n/translations';
 export default function CategoryDetailPage() {
   const { routeKey } = useParams();
   const navigate = useNavigate();
-  const { categories, systemSettings, fetchCategories } = useCategoryStore();
+  const { categories, fetchCategories } = useCategoryStore();
   const { fetchCodesOfCategory, batchSubmitChanges, saveToLocalCache } = useCodePoolStore();
   const isAdmin = useAuthStore((state) => state.isAdmin);
   const showToast = useToastStore((state) => state.showToast);
@@ -37,9 +37,8 @@ export default function CategoryDetailPage() {
   });
 
   const [threshold, setThreshold] = useState(() => {
-    const storedThreshold = readStorage(CACHE_KEYS.reportThreshold, null);
-    const fallbackThreshold = Number(storedThreshold ?? 10);
-    return Number.isFinite(fallbackThreshold) && fallbackThreshold > 0 ? fallbackThreshold : 10;
+    const storedThreshold = Number(readStorage(CACHE_KEYS.reportThreshold, 10));
+    return resolveReportThreshold({ storedValue: storedThreshold, fallback: 10 });
   });
   const [showHidden, setShowHidden] = useState(() => readStorage(CACHE_KEYS.showHiddenItems, false));
   const [pendingHiddenMap, setPendingHiddenMap] = useState({});
@@ -53,7 +52,8 @@ export default function CategoryDetailPage() {
   }, [showHidden]);
 
   useEffect(() => {
-    writeStorage(CACHE_KEYS.reportThreshold, threshold);
+    const nextThreshold = Number.isFinite(threshold) && threshold >= 1 ? threshold : 1;
+    writeStorage(CACHE_KEYS.reportThreshold, nextThreshold);
   }, [threshold]);
 
   useEffect(() => {
@@ -65,16 +65,9 @@ export default function CategoryDetailPage() {
     const cat = categories.find(c => c.id === categoryId);
     setCurrentCategory(cat);
 
-    const dbThreshold = Number(systemSettings?.cleanup_report_threshold);
-    if (Number.isFinite(dbThreshold) && dbThreshold > 0) {
-      setThreshold(dbThreshold);
-      writeStorage(CACHE_KEYS.reportThreshold, dbThreshold);
-      return;
-    }
-
-    const storedThreshold = Number(readStorage(CACHE_KEYS.reportThreshold, 10));
-    setThreshold(Number.isFinite(storedThreshold) && storedThreshold > 0 ? storedThreshold : 10);
-  }, [categoryId, categories, systemSettings?.cleanup_report_threshold, fetchCategories]);
+    const storedThreshold = Number(readStorage(CACHE_KEYS.reportThreshold, 1));
+    setThreshold(resolveReportThreshold({ storedValue: storedThreshold, fallback: 1 }));
+  }, [categoryId, categories, fetchCategories]);
 
   useEffect(() => {
     if (!routeKey) return;
@@ -294,7 +287,12 @@ export default function CategoryDetailPage() {
 
       <div className="bg-white border border-slate-200/70 rounded-2xl p-4 mb-4 shadow-sm text-[11px] text-slate-600 space-y-3">
         <div className="flex items-center gap-2 flex-wrap"><span className="font-bold text-slate-400">{t('createdTime')}</span><input type="date" className="p-1.5 border rounded-lg bg-slate-50 font-medium text-slate-700 focus:outline-none" value={startDate} onChange={e => setStartDate(e.target.value)} /><span className="text-slate-300">{t('to')}</span><input type="date" className="p-1.5 border rounded-lg bg-slate-50 font-medium text-slate-700 focus:outline-none" value={endDate} onChange={e => setEndDate(e.target.value)} /></div>
-        <div className="flex justify-between items-center gap-4 border-t border-slate-100 pt-2.5 flex-wrap"><div className="flex items-center gap-1.5"><span className="font-bold text-slate-400">{t('reportThreshold')}</span><input type="number" className="w-10 p-1 text-center border rounded-lg bg-slate-50 text-slate-800 font-bold" value={threshold} onChange={e => setThreshold(Math.max(0, parseInt(e.target.value) || 0))} /><span className="font-medium text-slate-500">{t('times')}</span><span className="ml-1 whitespace-nowrap rounded-md bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700 ring-1 ring-blue-100">{t('visibleCodesCount').replace('{count}', processedCodes.length)}</span></div><label className="flex items-center gap-1.5 cursor-pointer font-black text-blue-600 select-none"><input type="checkbox" className="w-4 h-4 rounded accent-blue-600" checked={showHidden} onChange={e => setShowHidden(e.target.checked)} /><span>{t('showHiddenItems')}</span></label></div>
+        <div className="flex justify-between items-center gap-4 border-t border-slate-100 pt-2.5 flex-wrap"><div className="flex items-center gap-1.5"><span className="font-bold text-slate-400">{t('reportThreshold')}</span><input type="number" className="w-10 p-1 text-center border rounded-lg bg-slate-50 text-slate-800 font-bold" value={threshold} onChange={e => {
+                  const nextValue = Math.max(1, parseInt(e.target.value) || 1);
+                  const sanitizedValue = nextValue > 0 ? nextValue : 1;
+                  setThreshold(sanitizedValue);
+                  writeStorage(CACHE_KEYS.reportThreshold, sanitizedValue);
+                }} /><span className="font-medium text-slate-500">{t('times')}</span><span className="ml-1 whitespace-nowrap rounded-md bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700 ring-1 ring-blue-100">{t('visibleCodesCount').replace('{count}', processedCodes.length)}</span></div><label className="flex items-center gap-1.5 cursor-pointer font-black text-blue-600 select-none"><input type="checkbox" className="w-4 h-4 rounded accent-blue-600" checked={showHidden} onChange={e => setShowHidden(e.target.checked)} /><span>{t('showHiddenItems')}</span></label></div>
       </div>
 
       {processedCodes.length === 0 ? ( <div className="text-center py-12 bg-white border border-slate-200/70 rounded-2xl text-slate-400 text-xs font-medium">{t('noCodesInRange')}</div> ) : (
