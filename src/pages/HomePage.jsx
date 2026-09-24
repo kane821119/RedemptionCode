@@ -8,6 +8,7 @@ import { toPublicRouteKey } from '../lib/publicIds';
 import { validateCategoryName, validateWebUrl } from '../lib/validation';
 import { confirmAction } from '../lib/browser';
 import { useLanguageStore } from '../i18n/languageStore';
+import SeoMeta from '../components/SeoMeta';
 
 const CategoryAdminPanel = lazy(() => import('../features/home/CategoryAdminPanel'));
 const CategoryGrid = lazy(() => import('../features/home/CategoryGrid'));
@@ -157,6 +158,7 @@ export default function HomePage() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-6 pb-28 bg-slate-50 min-h-screen font-sans selection:bg-blue-500 selection:text-white">
+      <SeoMeta path="/home" />
       <Suspense fallback={<div className="mb-4 h-20 rounded-2xl border border-slate-200 bg-white animate-pulse" />}>
         <CategoryAdminPanel
           isAdmin={isAdmin}

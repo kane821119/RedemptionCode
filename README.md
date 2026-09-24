@@ -1,19 +1,63 @@
-﻿# Redemption Code Hub
+﻿# RedemptionCode
 
-一個以行動端為核心的兌換碼分享、發行與管理平台。支援分類瀏覽、批次提交、貢獻者排行、管理者控制台、公開公告區，以及多語系匿名顯示。
+一個以行動端為核心的兌換碼分享、發行與管理平台，支援分類瀏覽、批次上架、表單驗證、貢獻者排行、公告管理、多語系介面，以及效能優先的 SEO 優化。
 
-## 功能總覽
+## 專案定位
+
+這個專案不是單純的兌換碼列表，而是一個可管理、可分類、可搜尋、可收藏的兌換碼集合工具。它同時兼顧：
+
+- 使用者體驗：快速搜尋、簡潔 UI、低延遲操作
+- 管理者功能：建立類別、批次發行、清理設定、公告管理
+- 多語系支援：繁體中文、英文、日文、越南文等
+- SEO：為主要頁面提供可維護的 title / description / OG / canonical
+- 效能優先：不為 SEO 犧牲整體 React SPA 的速度與 UX
+
+## 主要功能
 
 - 類別化兌換碼管理：建立、編輯、刪除分類
 - 批次發行兌換碼：支援文字、符號、中文、大小寫規則
-- 兌換碼狀態處理：已領取 / 回報失效 / 快取待提交
-- 貢獻者排行榜：依各貢獻者被領取總次數統計
-- 公開公告區：所有使用者都能看到公告，管理者可新增與刪除
-- 公告為多行文字，會自動顯示發佈時間
-- 管理者設定：本地清理門檻、清除時間點、分類安全設定
-- 清理門檻預設值為 10，最小值為 1，且會記住使用者本地設定
-- 多語系支援：繁體中文、英文、日文、越南文
-- 路由分層與懶載入：首頁、分類頁、聊天室頁各自獨立切分 chunk
+- 兌換碼狀態處理：已領取、回報失效、待提交、已提交
+- 貢獻者排行榜：依提交者被領取總次數統計
+- 公告系統：首頁公告區支援多筆公告與時間顯示
+- 管理者控制中心：分類設定、清理門檻、清理時間、公告管理
+- 多語系支援：繁體中文、英文、日文、越南文等語言切換
+- SEO 優化：頁面 meta、OG、canonical、語系文案整合
+- SPA 路由支援：支援前端路由與靜態部署 fallback
+
+## 效能優先的 SEO 策略
+
+這個專案採用的是輕量型 SEO，而不是重度 SSR。
+
+### 目前實作
+
+- 入口 HTML 會提供基礎 meta：title、description、og:title、og:description、og:image、canonical
+- 頁面會使用 `SeoMeta` 元件動態更新 title / description / OG / canonical
+- SEO 文案會從多語系字典讀取，避免寫死單一語言
+- 不做全站 SSR，不做重量級的預渲染，不用為 SEO 牽動整體 App 架構
+
+### 目的
+
+- 提升搜尋結果與社群分享的可讀性
+- 保持頁面在 Vite + React SPA 的低成本、低延遲特性
+- 確保 SEO 改進不會破壞使用者體驗
+
+## 使用者設定與本地記憶
+
+### 隱藏檢舉門檻
+
+這個設定與資料庫內容無關，完全是使用者本地偏好。
+
+- key：`report_threshold_v2`
+- 預設值：10
+- 最小值：1
+- 儲存方式：`localStorage`
+- 不再讀取 `system_settings` 的舊值
+
+這個設計避免：
+
+- 舊裝置與新裝置 key 不一致造成覆蓋
+- 資料庫 stale 值覆蓋使用者本地偏好
+- 不必要的 backend 依賴造成設定狀態不穩定
 
 ## 技術棧
 
@@ -27,41 +71,50 @@
 
 ## 核心架構
 
-### 前端
+### 前端頁面
 
-- 入口：App 與 Router
-- 頁面：
-  - HomePage
-  - CategoryDetailPage
-  - LobbyChatPage
-- 功能模組：
-  - features/home/CategoryAdminPanel.jsx
-  - features/home/CategoryGrid.jsx
-  - features/pool/BulkUploadForm.jsx
-- 狀態管理：
-  - store/categoryStore.js
-  - store/codePoolStore.js
-  - store/authStore.js
-  - store/systemStore.js
-  - store/toastStore.js
+- App
+- HomePage
+- CategoryDetailPage
+- LobbyChatPage
+
+### 功能模組
+
+- `src/features/home/CategoryAdminPanel.jsx`
+- `src/features/home/CategoryGrid.jsx`
+- `src/features/pool/BulkUploadForm.jsx`
+- `src/components/SeoMeta.jsx`
+
+### 狀態管理
+
+- `src/store/categoryStore.js`
+- `src/store/codePoolStore.js`
+- `src/store/authStore.js`
+- `src/store/systemStore.js`
+- `src/store/toastStore.js`
 
 ### 路由與 bundle 切分
 
-目前已採用 lazy-loaded page module，避免整個 app 一次性載入過大邏輯：
+目前採用 lazy-loaded page modules：
 
-- HomePage 以 lazy 載入
-- CategoryDetailPage 以 lazy 載入
-- LobbyChatPage 以 lazy 載入
+- HomePage
+- CategoryDetailPage
+- LobbyChatPage
 
-這樣可以讓首屏更輕，且每個頁面資源在需要時才載入。
+這樣可以：
 
-## 主要資料模型
+- 減少首屏載入量
+- 把頁面資源切成更小的 chunk
+- 讓使用者在需要時才載入功能
+
+## 資料模型
 
 ### categories
 
-用來管理兌換碼分類與分類設定。
+管理分類資料與類別設定。
 
-欄位重點：
+重點欄位：
+
 - id
 - name
 - show_secret_key
@@ -78,7 +131,8 @@
 
 實際兌換碼資料。
 
-欄位重點：
+重點欄位：
+
 - id
 - category_id
 - code
@@ -91,74 +145,72 @@
 
 ### announcements
 
-用來保存公開公告資料，公告內容會顯示在首頁公告區，所有使用者都能看到。
+公開公告列表。
 
-欄位重點：
+重點欄位：
+
 - id
 - content
 - created_at
 - updated_at
 
 公告規則：
-- 內容可為多行文字
-- 會自動顯示發佈時間
-- 管理者可直接新增、刪除
-- 不再使用單一 `announcement_text` 設定值，而是改為多筆公告列表
+
+- 支援多行文字
+- 會自動附帶發佈時間
+- 管理者可以新增與刪除
+- 列表式資料保存，避免單一前端狀態問題
 
 ### system_settings
 
-保留用來保存管理者的全域設定，例如：
+保留的全域管理設定，例如：
+
 - cleanup_report_threshold
 - cleanup_report_time
 
-但目前前端的「隱藏檢舉門檻」並不依賴資料庫來源；它會直接寫入瀏覽器 localStorage，存放在 `report_threshold_v2`，並以使用者本地設定為主。
+但目前「隱藏檢舉門檻」不再依賴這些資料庫值，而是直接使用前端本地設定。
 
-也就是說：
-- 預設值為 10
-- 最小值為 1
-- 使用者可自行設定並記憶
-- 不再從資料庫讀取同名設定值
-
-## 目前業務規則
+## 業務規則
 
 ### 1. 兌換碼計數
 
-- 主要計數欄位為 claim_count
-- 貢獻者榜按照每位提交者的被領取總次數統計
-- 不再使用如 like_count 的過時邏輯
+- 主要計數欄位為 `claim_count`
+- 貢獻者排行榜依各提交者的被領取總次數統計
+- 不使用過時的 like / vote 類型邏輯
 
 ### 2. 提交去重
 
-批次提交前會先做 ID 去重，避免同一批次中重複 item 造成計數累加錯誤。
+批次提交前會先做去重，避免重複項目造成計數錯誤。
 
 ### 3. 匿名提交者
 
-當提交者欄位為空白時，系統會顯示為匿名訪客；會依目前語系解析對應文案，而非寫死中文。
+當提交者欄位空白時，顯示為匿名訪客，並依目前語系定義正確翻譯。
 
 ### 4. 備註顯示
 
-- 備註放在提交者上方
-- 兌換碼列表中會在代碼內容下方顯示
+- 備註顯示於提交者資訊上方
+- 兌換碼列表中會在代碼內容下方呈現
 
-### 5. 公告機制
+### 5. 清理機制
 
-- 公告是公開列表，所有使用者都能閱覽
-- 管理者在首頁公告區直接輸入內容
-- 公告支援多行文字，並自動附帶時間戳記
-- 管理者可直接刪除不需要的公告
-- 每則公告以資料庫記錄保存，非前端單一文字狀態
-
-### 6. 清理機制
-
-- 清理門檻預設為 10 次
+- 預設門檻為 10
 - 最小值為 1
-- 門檻值由瀏覽器 localStorage 記憶，存放在 `report_threshold_v2`
-- 不再依賴資料庫設定同步，避免舊值覆蓋使用者本地設定
-- 清理時間點可由管理者在控制中心設定
+- 由瀏覽器 `localStorage` 記憶
+- 不與資料庫設定做雙向同步
+
+### 6. 路由與部署
+
+- SPA 使用前端路由
+- 靜態部署時需要 fallback redirect
+- Netlify 可使用 `public/_redirects`，內容如下：
+
+```text
+/* /index.html 200
+```
 
 ## 環境變數
 
-建立專案根目錄 `.env`：
+建立 `.env`：
 
 ```env
 VITE_SUPABASE_URL=https://<project>.supabase.co
@@ -172,7 +224,7 @@ npm install
 npm run dev
 ```
 
-開啟瀏覽器到：
+開啟瀏覽器：
 
 ```text
 http://localhost:5173
@@ -203,24 +255,30 @@ src/
   router/
   services/
   store/
+public/
+  _redirects
+  og-image.svg
 ```
 
 ## 注意事項
 
-- `localStorage` 會用於前端偏好與使用者設定，如檢舉門檻記憶，不作為安全資料庫
+- `localStorage` 只用於使用者本地偏好與前端快取，不作為安全資料庫
 - 檢舉門檻目前為本地設定：`report_threshold_v2`，預設 10、最小 1
-- 管理者功能與 RLS 政策需一起佈署，不能只在前端強制隱藏
-- `category_id + code` 仍然是唯一性保護，讓不同類別可重複使用相同兌換碼
-- 努力遵循分層設計：UI / Store / Service / Utilities 分離，減少耦合
+- 管理者功能與 RLS 政策需同時佈署，不能只在前端限制 UI
+- `category_id + code` 作為保護條件，讓不同類別可重複使用相同兌換碼
+- 專案保持分層設計：UI / Store / Service / Utilities 分離
+- SEO 優化保持輕量，不做會拖慢體驗的重型 SSR
 
-## 版本狀態
+## 目前版本狀態
 
-目前專案已完成：
-- 兌換碼 claim 計數顯示與統計
+已完成：
+
+- 兌換碼 claim 計數與統計顯示
 - 批次提交去重修正
 - 多語系匿名名稱處理
-- 公開公告列表與管理者新增/刪除
+- 公告列表與管理者新增/刪除
 - 公告時間戳與多行文字支援
-- 管理者清除設定同步
-- 路由層 lazy-loaded chunk 切分
-- README 與功能狀態對齊更新
+- 本地報告門檻設定與記憶
+- SPA 路由與靜態部署 fallback
+- 多語系 SEO meta 方案
+- README 更新與文件對齊

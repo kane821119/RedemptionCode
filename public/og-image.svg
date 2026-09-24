@@ -1,0 +1,22 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="url(#paint0_linear_1_2)"/>
+  <rect x="72" y="78" width="1056" height="474" rx="32" fill="rgba(15,23,42,0.18)" stroke="rgba(255,255,255,0.22)"/>
+  <circle cx="224" cy="208" r="72" fill="#F8FAFC" fill-opacity="0.18"/>
+  <circle cx="340" cy="422" r="48" fill="#F8FAFC" fill-opacity="0.12"/>
+  <circle cx="900" cy="180" r="86" fill="#F8FAFC" fill-opacity="0.12"/>
+  <path d="M178 282C178 246.863 206.863 218 242 218H390C425.137 218 454 246.863 454 282V328C454 363.137 425.137 392 390 392H242C206.863 392 178 363.137 178 328V282Z" fill="#F8FAFC" fill-opacity="0.18"/>
+  <path d="M284 162H422C449.614 162 472 184.386 472 212V224H234V212C234 184.386 256.386 162 284 162Z" fill="#F8FAFC" fill-opacity="0.2"/>
+  <rect x="552" y="186" width="420" height="54" rx="14" fill="#F8FAFC" fill-opacity="0.18"/>
+  <rect x="552" y="268" width="320" height="26" rx="13" fill="#F8FAFC" fill-opacity="0.12"/>
+  <rect x="552" y="322" width="370" height="26" rx="13" fill="#F8FAFC" fill-opacity="0.12"/>
+  <rect x="552" y="376" width="260" height="26" rx="13" fill="#F8FAFC" fill-opacity="0.12"/>
+  <text x="552" y="156" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="52" font-weight="700">RedemptionCode</text>
+  <text x="552" y="480" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="600" opacity="0.8">兌換碼 · 分類 · 集散站</text>
+  <defs>
+    <linearGradient id="paint0_linear_1_2" x1="104" y1="82" x2="1114" y2="544" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="0.5" stop-color="#1D4ED8"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -11,6 +11,7 @@ import { resolveCategoryIdFromRoute } from '../lib/publicIds';
 import { copyTextToClipboard, confirmAction } from '../lib/browser';
 import { useLanguageStore } from '../i18n/languageStore';
 import { translations } from '../i18n/translations';
+import SeoMeta from '../components/SeoMeta';
 
 export default function CategoryDetailPage() {
   const { routeKey } = useParams();
@@ -256,9 +257,24 @@ export default function CategoryDetailPage() {
     return !item.hasSubmittedAction && (action === 'used' || action === 'reported');
   });
 
-  if (!currentCategory) return <div className="text-center py-10 text-slate-400 text-xs font-bold">{t('categoryLoading')}</div>;
+  if (!currentCategory) return (
+    <div className="text-center py-10 text-slate-400 text-xs font-bold">
+      <SeoMeta
+        title="分類載入中"
+        description="正在載入分類內容，請稍候。"
+        path={routeKey ? `/category/${routeKey}` : '/'}
+      />
+      {t('categoryLoading')}
+    </div>
+  );
+
   return (
     <div className="max-w-md mx-auto px-4 py-6 pb-28 bg-slate-50 min-h-screen font-sans selection:bg-blue-500 selection:text-white">
+      <SeoMeta
+        title={currentCategory.name}
+        description={t('seoCategoryDescription').replace('{category}', currentCategory.name)}
+        path={routeKey ? `/category/${routeKey}` : '/'}
+      />
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="min-w-0">
           <BulkUploadForm category={currentCategory} onUploaded={() => setSyncTrigger(p => p + 1)} />
