@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useLanguageStore } from '../i18n/languageStore';
 import { useCategoryStore } from '../store/categoryStore';
+import { useToastStore } from '../store/toastStore';
+import { confirmAction } from '../lib/browser';
 import { toPublicRouteKey } from '../lib/publicIds';
+import { formatLocalDateTime } from '../lib/storage';
 
 export default function GlobalHeader() {
   const navigate = useNavigate();
@@ -11,8 +14,42 @@ export default function GlobalHeader() {
   const locale = useLanguageStore((state) => state.locale);
   const setLocale = useLanguageStore((state) => state.setLocale);
   const t = useLanguageStore((state) => state.t);
-  const { userName, loginWithGoogle, logout, loading: authLoading } = useAuthStore();
+  const { userName, loginWithGoogle, logout, loading: authLoading, isAdmin } = useAuthStore();
   const categories = useCategoryStore((state) => state.categories);
+  const announcements = useCategoryStore((state) => state.announcements);
+  const fetchAnnouncements = useCategoryStore((state) => state.fetchAnnouncements);
+  const createAnnouncement = useCategoryStore((state) => state.createAnnouncement);
+  const deleteAnnouncement = useCategoryStore((state) => state.deleteAnnouncement);
+  const showToast = useToastStore((state) => state.showToast);
+  const [announcementDraft, setAnnouncementDraft] = useState('');
+
+  useEffect(() => {
+    fetchAnnouncements().catch(() => {});
+  }, [fetchAnnouncements]);
+
+  const handleSaveAnnouncement = async () => {
+    const content = announcementDraft.trim();
+    if (!content) return showToast(t('announcementRequired'), 'error');
+
+    try {
+      await createAnnouncement(content);
+      setAnnouncementDraft('');
+      showToast(t('createSuccess'));
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id) => {
+    if (!confirmAction(t('deleteAnnouncementConfirm'))) return;
+
+    try {
+      await deleteAnnouncement(id);
+      showToast(t('deleteAnnouncementSuccess'));
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  };
 
   const pathname = location.pathname;
   const showChat = pathname !== '/lobby';
@@ -100,6 +137,60 @@ export default function GlobalHeader() {
             </div>
           )}
         </div>
+
+        {(announcements.length > 0 || isAdmin) && (
+          <section className="mt-3 border-t border-amber-200 pt-2.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700">{t('announcement')}</span>
+            <span className="text-[9px] font-bold text-amber-700">{announcements.length}</span>
+          </div>
+
+          {isAdmin && (
+            <div className="mb-2 space-y-2">
+              <textarea
+                rows="2"
+                value={announcementDraft}
+                onChange={(event) => setAnnouncementDraft(event.target.value)}
+                className="w-full resize-none rounded-xl border border-amber-200 bg-white p-2 text-xs text-slate-700 shadow-inner placeholder:text-slate-400 focus:border-amber-400 focus:outline-none"
+                placeholder={t('announcementPlaceholder')}
+              />
+              <button
+                type="button"
+                onClick={handleSaveAnnouncement}
+                className="w-full rounded-xl bg-amber-500 px-3 py-2 text-[10px] font-black text-white shadow-sm hover:bg-amber-400 transition-colors"
+              >
+                {t('createAnnouncement')}
+              </button>
+            </div>
+          )}
+
+          {announcements.length === 0 ? (
+            <p className="text-xs leading-relaxed text-slate-600">{t('announcementEmpty')}</p>
+          ) : (
+            <div className="space-y-2">
+              {announcements.map((item) => (
+                <div key={item.id} className="rounded-xl border border-amber-200 bg-amber-50/70 p-2.5">
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <span className="text-[9px] font-bold text-amber-700">
+                      {formatLocalDateTime(item.created_at)}
+                    </span>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAnnouncement(item.id)}
+                        className="text-[9px] font-black text-rose-600 hover:text-rose-700"
+                      >
+                        {t('announcementDelete')}
+                      </button>
+                    )}
+                  </div>
+                  <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-700">{item.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          </section>
+        )}
       </div>
     </header>
   );

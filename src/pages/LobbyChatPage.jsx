@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/authStore';
 import { validateMessage } from '../lib/validation';
 import { confirmAction } from '../lib/browser';
 import { useLanguageStore } from '../i18n/languageStore';
+import { formatLocalDateTime } from '../lib/storage';
 
 export default function LobbyChatPage() {
   const navigate = useNavigate();
@@ -171,7 +172,7 @@ export default function LobbyChatPage() {
                     )}
                   </div>
                   
-                  <span className="text-[9px] text-slate-400 font-bold">{new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  <span className="text-[9px] text-slate-400 font-bold">{formatLocalDateTime(msg.created_at)}</span>
                 </div>
                 
                 <p className="text-xs text-slate-600 font-medium leading-relaxed break-all pr-20 pl-1">{msg.content}</p>

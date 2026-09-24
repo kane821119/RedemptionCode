@@ -5,6 +5,8 @@ export const CACHE_KEYS = {
   showHiddenItems: 'show_hidden_items_v1',
   actionHistory: 'code_action_history_v1',
   reportThreshold: 'report_threshold_v2',
+  pendingCategories: 'pending_categories_queue_v1',
+  pendingCategorySupports: 'pending_category_supports_v1',
 };
 
 export const normalizePositiveNumber = (value, fallback = 1) => {
@@ -37,6 +39,14 @@ export const readStorage = (key, fallback = null) => {
 
 export const writeStorage = (key, value) => {
   localStorage.setItem(key, JSON.stringify(value));
+};
+
+export const formatLocalDateTime = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const pad = (part) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 };
 
 export const safeJsonParse = (value, fallback = {}) => {

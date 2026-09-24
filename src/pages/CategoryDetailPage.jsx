@@ -6,7 +6,7 @@ import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
 import BulkUploadForm from '../features/pool/BulkUploadForm';
 import { supabase } from '../services/supabaseClient';
-import { CACHE_KEYS, readStorage, resolveReportThreshold, writeStorage } from '../lib/storage';
+import { CACHE_KEYS, readStorage, resolveReportThreshold, writeStorage, formatLocalDateTime } from '../lib/storage';
 import { resolveCategoryIdFromRoute } from '../lib/publicIds';
 import { copyTextToClipboard, confirmAction } from '../lib/browser';
 import { useLanguageStore } from '../i18n/languageStore';
@@ -21,7 +21,6 @@ export default function CategoryDetailPage() {
   const isAdmin = useAuthStore((state) => state.isAdmin);
   const showToast = useToastStore((state) => state.showToast);
   const t = useLanguageStore((state) => state.t);
-  const locale = useLanguageStore((state) => state.locale);
   const categoryId = resolveCategoryIdFromRoute(routeKey, categories);
 
   const [currentCategory, setCurrentCategory] = useState(null);
@@ -329,7 +328,7 @@ export default function CategoryDetailPage() {
               <div className="grid grid-cols-2 gap-y-1.5 text-[10px] text-slate-400 font-bold border-b border-slate-100 pb-2.5 mb-2.5 pl-1">
                 {currentCategory.show_secret_key && <div className="truncate">{t('keyLabel')} <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-mono font-black">{item.secret_key || t('none')}</span></div>}
                 <div className="truncate">{t('contributorLabel')} <span className="text-slate-600 font-extrabold">{getDisplayContributor(item.contributor)}</span></div>
-                 <div className="truncate">{t('createdLabel')} <span className="text-slate-600 font-medium">{new Date(item.created_at).toLocaleString(locale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span></div>
+                 <div className="truncate">{t('createdLabel')} <span className="text-slate-600 font-medium">{formatLocalDateTime(item.created_at)}</span></div>
                  <div className={`truncate ${Number(item.claim_count || 0) > 0 ? 'text-blue-500' : ''}`}>
                    {t('claimCountLabel')} {Number(item.claim_count || 0)}
                  </div>

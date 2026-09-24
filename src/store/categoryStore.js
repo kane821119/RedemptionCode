@@ -1,10 +1,17 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabaseClient';
 
+const isMissingTableError = (error) => {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('could not find the table') ||
+    (message.includes('relation') && message.includes('does not exist')) ||
+    message.includes('schema cache');
+};
+
 export const useCategoryStore = create((set, get) => ({
   categories: [],
   announcements: [],
-  systemSettings: { cleanup_report_threshold: '10', cleanup_report_time: '00:00' },
+  pendingCategoryQueue: [],
 
   fetchCategories: async () => {
     const { data, error } = await supabase.from('categories').select('*').order('name');
@@ -51,39 +58,155 @@ export const useCategoryStore = create((set, get) => ({
     await get().fetchCategories();
   },
 
-  fetchSystemSettings: async () => {
-    const { data, error } = await supabase.from('system_settings').select('*');
-    if (error) throw error;
+  fetchPendingCategoryQueue: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('pending_category_requests')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
 
-    const settings = (data || []).reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
-    set({ systemSettings: { cleanup_report_threshold: '10', cleanup_report_time: '00:00', announcement_text: '', ...settings } });
+      if (error) {
+        if (isMissingTableError(error)) {
+          set({ pendingCategoryQueue: [] });
+          return [];
+        }
+        throw error;
+      }
+
+      const queue = (data || []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        showSecretKey: item.show_secret_key ?? false,
+        keepLetters: item.keep_letters ?? true,
+        keepNumbers: item.keep_numbers ?? true,
+        keepSymbols: item.keep_symbols ?? false,
+        forceUppercase: item.force_uppercase ?? true,
+        keepChinese: item.keep_chinese ?? false,
+        webUrl: item.web_url ?? '',
+        submittedBy: item.submitted_by ?? 'user',
+        createdAt: item.created_at ?? new Date().toISOString(),
+        supportCount: item.support_count ?? 0,
+      }));
+
+      set({ pendingCategoryQueue: queue });
+      return queue;
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        set({ pendingCategoryQueue: [] });
+        return [];
+      }
+      throw error;
+    }
   },
 
-  updateCleanupRules: async (threshold, timePoint = '00:00') => {
-    const normalizedThreshold = Math.max(1, Number(threshold) || 10).toString();
-    const normalizedTime = timePoint || '00:00';
-
-    const { error: thresholdError } = await supabase.rpc('api_update_system_settings', {
-      p_key: 'cleanup_report_threshold',
-      p_value: normalizedThreshold,
+  supportPendingCategoryRequest: async (requestId) => {
+    const { data, error } = await supabase.rpc('api_support_pending_category_request', {
+      p_request_id: requestId,
     });
+    if (error) throw error;
+    await get().fetchPendingCategoryQueue();
+    return data;
+  },
 
-    if (thresholdError) throw thresholdError;
+  submitPendingCategoryRequest: async (payload) => {
+    const insertPayload = {
+      name: payload.name,
+      show_secret_key: payload.showSecretKey,
+      keep_letters: payload.keepLetters,
+      keep_numbers: payload.keepNumbers,
+      keep_symbols: payload.keepSymbols,
+      force_uppercase: payload.forceUppercase,
+      keep_chinese: payload.keepChinese,
+      web_url: payload.webUrl,
+      status: 'pending',
+      submitted_by: 'user',
+    };
 
-    const { error: timeError } = await supabase.rpc('api_update_system_settings', {
-      p_key: 'cleanup_report_time',
-      p_value: normalizedTime,
-    });
+    try {
+      const { data, error } = await supabase
+        .from('pending_category_requests')
+        .insert(insertPayload)
+        .select()
+        .single();
 
-    if (timeError) throw timeError;
+      if (error) {
+        if (isMissingTableError(error)) {
+          throw new Error('資料表 pending_category_requests 尚未建立，請先在 Supabase 建立這張表。');
+        }
+        throw error;
+      }
 
-    set((state) => ({
-      systemSettings: {
-        ...state.systemSettings,
-        cleanup_report_threshold: normalizedThreshold,
-        cleanup_report_time: normalizedTime,
-      },
-    }));
+      await get().fetchPendingCategoryQueue();
+      return data;
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        throw new Error('資料表 pending_category_requests 尚未建立，請先在 Supabase 建立這張表。');
+      }
+      throw error;
+    }
+  },
+
+  approvePendingCategoryRequest: async (requestId, payload) => {
+    const { data: userData } = await supabase.auth.getUser();
+    const reviewerId = userData?.user?.id ?? null;
+
+    await get().createCategory(payload);
+
+    try {
+      const { error } = await supabase
+        .from('pending_category_requests')
+        .update({
+          status: 'approved',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: reviewerId,
+        })
+        .eq('id', requestId);
+
+      if (error) {
+        if (isMissingTableError(error)) {
+          throw new Error('資料表 pending_category_requests 尚未建立，請先在 Supabase 建立這張表。');
+        }
+        throw error;
+      }
+
+      await get().fetchPendingCategoryQueue();
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        throw new Error('資料表 pending_category_requests 尚未建立，請先在 Supabase 建立這張表。');
+      }
+      throw error;
+    }
+  },
+
+  rejectPendingCategoryRequest: async (requestId) => {
+    const { data: userData } = await supabase.auth.getUser();
+    const reviewerId = userData?.user?.id ?? null;
+
+    try {
+      const { error } = await supabase
+        .from('pending_category_requests')
+        .update({
+          status: 'rejected',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: reviewerId,
+        })
+        .eq('id', requestId);
+
+      if (error) {
+        if (isMissingTableError(error)) {
+          throw new Error('資料表 pending_category_requests 尚未建立，請先在 Supabase 建立這張表。');
+        }
+        throw error;
+      }
+
+      await get().fetchPendingCategoryQueue();
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        throw new Error('資料表 pending_category_requests 尚未建立，請先在 Supabase 建立這張表。');
+      }
+      throw error;
+    }
   },
 
   fetchAnnouncements: async () => {
