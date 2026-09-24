@@ -59,6 +59,17 @@
 - 資料庫 stale 值覆蓋使用者本地偏好
 - 不必要的 backend 依賴造成設定狀態不穩定
 
+### Legacy cleanup
+
+本次已清理的舊版項目：
+
+- 移除未使用的 `src/store/systemStore.js`
+- 移除公開讀取黑名單的舊 policy
+- 移除未使用的舊版 `api_increment_code_like` 函數
+- 移除舊版 `api_insert_codes_bulk(uuid, text[], text[], text)` 重載
+
+目前專案中的資料契約已經收斂到實際使用者仍在呼叫的那一套，不再保留不被引用的歷史版本。
+
 ## 技術棧
 
 - React 19
@@ -87,11 +98,15 @@
 
 ### 狀態管理
 
+目前實際在用的 store 只有以下幾個：
+
 - `src/store/categoryStore.js`
 - `src/store/codePoolStore.js`
 - `src/store/authStore.js`
-- `src/store/systemStore.js`
+- `src/store/chatStore.js`
 - `src/store/toastStore.js`
+
+已移除舊版 `systemStore.js`，因為專案中已無任何引用，且它與目前的資料契約不再一致。
 
 ### 路由與 bundle 切分
 
