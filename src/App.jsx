@@ -4,16 +4,19 @@ import AppRoutes from './router/AppRoutes';
 import Toast from './components/Toast';
 import GlobalHeader from './components/GlobalHeader';
 import { useAuthStore } from './store/authStore';
+import { useThemeStore } from './store/themeStore';
 import { useLanguageStore } from './i18n/languageStore';
 
 export default function App() {
   const initAuth = useAuthStore((state) => state.initAuth);
   const initLocale = useLanguageStore((state) => state.initLocale);
+  const initTheme = useThemeStore((state) => state.initTheme);
 
   useEffect(() => {
     initAuth();
     initLocale();
-  }, [initAuth, initLocale]);
+    initTheme();
+  }, [initAuth, initLocale, initTheme]);
 
   return (
     <BrowserRouter>

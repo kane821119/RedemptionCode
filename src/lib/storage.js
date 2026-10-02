@@ -5,6 +5,7 @@ export const CACHE_KEYS = {
   showHiddenItems: 'show_hidden_items_v1',
   actionHistory: 'code_action_history_v1',
   reportThreshold: 'report_threshold_v2',
+  createdDateRange: 'category_created_date_range_v1',
   pendingCategories: 'pending_categories_queue_v1',
   pendingCategorySupports: 'pending_category_supports_v1',
 };

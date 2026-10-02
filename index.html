@@ -7,6 +7,7 @@
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="RedemptionCode 是一個管理與探索兌換碼的集中平台，提供分類、收藏與快速檢視功能。" />
     <meta name="theme-color" content="#0f172a" />
+    <link rel="icon" type="image/svg+xml" href="/redemption-code-icon.svg?v=2" />
     <meta property="og:title" content="RedemptionCode" />
     <meta property="og:description" content="RedemptionCode 是一個管理與探索兌換碼的集中平台，提供分類、收藏與快速檢視功能。" />
     <meta property="og:type" content="website" />
@@ -14,6 +15,13 @@
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="canonical" href="https://example.com/" />
     <title>RedemptionCode</title>
+    <script>
+      try {
+        if (localStorage.getItem('app_theme') === 'dark') {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

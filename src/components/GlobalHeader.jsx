@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { useLanguageStore } from '../i18n/languageStore';
 import { useCategoryStore } from '../store/categoryStore';
 import { useToastStore } from '../store/toastStore';
+import { useThemeStore } from '../store/themeStore';
 import { confirmAction } from '../lib/browser';
 import { toPublicRouteKey } from '../lib/publicIds';
 import { formatLocalDateTime } from '../lib/storage';
@@ -28,6 +29,8 @@ export default function GlobalHeader() {
   const locale = useLanguageStore((state) => state.locale);
   const setLocale = useLanguageStore((state) => state.setLocale);
   const t = useLanguageStore((state) => state.t);
+  const isDark = useThemeStore((state) => state.isDark);
+  const toggleTheme = useThemeStore((state) => state.toggleTheme);
   const { userName, loginWithGoogle, logout, loading: authLoading, isAdmin } = useAuthStore();
   const categories = useCategoryStore((state) => state.categories);
   const announcements = useCategoryStore((state) => state.announcements);
@@ -128,6 +131,17 @@ export default function GlobalHeader() {
                   <span>{t('blacklistShortTitle')}</span>
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label={t(isDark ? 'useLightTheme' : 'useDarkTheme')}
+                aria-pressed={isDark}
+                title={t(isDark ? 'useLightTheme' : 'useDarkTheme')}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm text-slate-700 shadow-sm"
+              >
+                <span aria-hidden="true">{isDark ? '☀️' : '🌙'}</span>
+              </button>
 
               <div className="relative flex h-8 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm focus-within:ring-2 focus-within:ring-blue-300" title={t('language')}>
                 <select

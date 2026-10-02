@@ -40,13 +40,13 @@ export default function CategoryDetailPage() {
   const [syncTrigger, setSyncTrigger] = useState(0);
   const [localActions, setLocalActions] = useState(() => readStorage(CACHE_KEYS.actionHistory, {}));
 
-  const [startDate, setStartDate] = useState('2020-01-01');
-  const [endDate, setEndDate] = useState(() => {
-    const today = new Date();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${today.getFullYear()}-${month}-${day}`;
-  });
+  const [dateRanges, setDateRanges] = useState(() => readStorage(CACHE_KEYS.createdDateRange, {}));
+  const today = new Date();
+  const defaultEndDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const storedStartDate = dateRanges[categoryId];
+  const startDate = (typeof storedStartDate === 'string' ? storedStartDate : storedStartDate?.startDate) || '2020-01-01';
+  const [endDateSelection, setEndDateSelection] = useState(null);
+  const endDate = endDateSelection?.categoryId === categoryId ? endDateSelection.value : defaultEndDate;
 
   const [threshold, setThreshold] = useState(() => {
     const storedThreshold = Number(readStorage(CACHE_KEYS.reportThreshold, 10));
@@ -58,6 +58,10 @@ export default function CategoryDetailPage() {
   useEffect(() => {
     writeStorage(CACHE_KEYS.actionHistory, localActions);
   }, [localActions]);
+
+  useEffect(() => {
+    writeStorage(CACHE_KEYS.createdDateRange, dateRanges);
+  }, [dateRanges]);
 
   useEffect(() => {
     writeStorage(CACHE_KEYS.showHiddenItems, showHidden);
@@ -318,7 +322,7 @@ export default function CategoryDetailPage() {
       </div>
 
       <div className="bg-white border border-slate-200/70 rounded-2xl p-4 mb-4 shadow-sm text-[11px] text-slate-600 space-y-3">
-        <div className="flex items-center gap-2 flex-wrap"><span className="font-bold text-slate-400">{t('createdTime')}</span><input type="date" className="p-1.5 border rounded-lg bg-slate-50 font-medium text-slate-700 focus:outline-none" value={startDate} onChange={e => setStartDate(e.target.value)} /><span className="text-slate-300">{t('to')}</span><input type="date" className="p-1.5 border rounded-lg bg-slate-50 font-medium text-slate-700 focus:outline-none" value={endDate} onChange={e => setEndDate(e.target.value)} /></div>
+        <div className="flex items-center gap-2 flex-wrap"><span className="font-bold text-slate-400">{t('createdTime')}</span><input type="date" className="p-1.5 border rounded-lg bg-slate-50 font-medium text-slate-700 focus:outline-none" value={startDate} onChange={e => setDateRanges((ranges) => ({ ...ranges, [categoryId]: e.target.value }))} /><span className="text-slate-300">{t('to')}</span><input type="date" className="p-1.5 border rounded-lg bg-slate-50 font-medium text-slate-700 focus:outline-none" value={endDate} onChange={e => setEndDateSelection({ categoryId, value: e.target.value })} /></div>
         <div className="flex justify-between items-center gap-4 border-t border-slate-100 pt-2.5 flex-wrap"><div className="flex items-center gap-1.5"><span className="font-bold text-slate-400">{t('reportThreshold')}</span><input type="number" className="w-10 p-1 text-center border rounded-lg bg-slate-50 text-slate-800 font-bold" value={threshold} onChange={e => {
                   const nextValue = Math.max(1, parseInt(e.target.value) || 1);
                   const sanitizedValue = nextValue > 0 ? nextValue : 1;
@@ -393,7 +397,7 @@ export default function CategoryDetailPage() {
 
       {hasPendingSubmissions && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100vw-32px)] max-w-md z-40 px-1">
-          <button onClick={handleSyncSubmit} className="w-1/2 mx-auto py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black rounded-xl text-xs shadow-lg tracking-widest">{t('submit')}</button>
+          <button onClick={handleSyncSubmit} className="w-full mx-auto py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black rounded-xl text-xs shadow-lg tracking-widest">{t('submit')}</button>
         </div>
       )}
     </div>

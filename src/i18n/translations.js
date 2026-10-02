@@ -1,6 +1,8 @@
 export const translations = {
   'zh-TW': {
     appName: '兌換碼集散廳',
+    useDarkTheme: '切換為暗色主題',
+    useLightTheme: '切換為亮色主題',
     appSubtitle: 'Card Dashboard',
     navChat: '💬 交流',
     loginGoogle: 'Google 登入',
@@ -202,6 +204,8 @@ export const translations = {
   },
   'en-US': {
     appName: 'Redemption Code Hub',
+    useDarkTheme: 'Switch to dark theme',
+    useLightTheme: 'Switch to light theme',
     appSubtitle: 'Card Dashboard',
     navChat: '💬 Chat',
     loginGoogle: 'Google Sign In',
