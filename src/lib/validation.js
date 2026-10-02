@@ -11,7 +11,7 @@ import { getLocaleText } from '../i18n/languageStore';
 export const sanitizeText = (value, { maxLength = 200, allowLineBreak = false } = {}) => {
   const normalized = String(value ?? '')
     .replace(/\r\n/g, '\n')
-    .replace(/[\u0000-\u001F\u007F]/g, '');
+    .replace(/\p{Cc}/gu, (character) => (allowLineBreak && character === '\n' ? character : ''));
 
   const trimmed = allowLineBreak ? normalized.trim() : normalized.replace(/\s+/g, ' ').trim();
   return trimmed.slice(0, maxLength);

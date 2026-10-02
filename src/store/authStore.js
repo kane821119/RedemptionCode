@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../services/supabaseClient';
 import { getLocaleText } from '../i18n/languageStore';
 
-export const useAuthStore = create((set, get) => ({
+export const useAuthStore = create((set) => ({
   user: null,
   userName: null,
   isAdmin: false,
@@ -14,7 +14,7 @@ export const useAuthStore = create((set, get) => ({
     if (user) {
       const { data: isAdmin } = await supabase.rpc('is_admin');
       // 僅提取 full_name 作為顯示稱呼，絕不在前端儲存與展示 email 資訊
-      const name = user.user_metadata?.full_name || getLocaleText('loggedInUser');
+      const name = user.is_anonymous ? null : user.user_metadata?.full_name || getLocaleText('loggedInUser');
       set({ user, userName: name, isAdmin, loading: false });
 
       const pendingRedirect = sessionStorage.getItem('auth_redirect_target');
@@ -32,7 +32,7 @@ export const useAuthStore = create((set, get) => ({
     supabase.auth.onAuthStateChange(async (_, session) => {
       if (session?.user) {
         const { data: isAdmin } = await supabase.rpc('is_admin');
-        const name = session.user.user_metadata?.full_name || getLocaleText('loggedInUser');
+        const name = session.user.is_anonymous ? null : session.user.user_metadata?.full_name || getLocaleText('loggedInUser');
         set({ user: session.user, userName: name, isAdmin });
 
         const pendingRedirect = sessionStorage.getItem('auth_redirect_target');
@@ -46,6 +46,17 @@ export const useAuthStore = create((set, get) => ({
         set({ user: null, userName: null, isAdmin: false });
       }
     });
+  },
+
+  ensurePublisherSession: async () => {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    if (session?.user) return session;
+
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) throw error;
+    if (!data.session) throw new Error(getLocaleText('publisherSessionUnavailable'));
+    return data.session;
   },
 
   // 保持目前頁面不變，登入完成後回到現在所在頁面

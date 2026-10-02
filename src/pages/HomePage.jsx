@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCategoryStore } from '../store/categoryStore';
+import { useChatStore } from '../store/chatStore';
 import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
 import { readStorage, writeStorage, CACHE_KEYS, formatLocalDateTime } from '../lib/storage';
@@ -17,7 +18,6 @@ export default function HomePage() {
   const {
     categories,
     fetchCategories,
-    createCategory,
     updateCategory,
     deleteCategory,
     trackCategoryClick,
@@ -29,11 +29,14 @@ export default function HomePage() {
     pendingCategoryQueue,
   } = useCategoryStore();
   const showToast = useToastStore((state) => state.showToast);
+  const locale = useLanguageStore((state) => state.locale);
   const t = useLanguageStore((state) => state.t);
-  const { isAdmin } = useAuthStore();
+  const { isAdmin, loading: authLoading, userName } = useAuthStore();
+  const { bannedEmails, fetchBannedUsers, banUserEmail } = useChatStore();
   const [editingCat, setEditingCat] = useState(null);
   const [isCreateCardOpen, setIsCreateCardOpen] = useState(false);
-  const [isPendingQueueOpen, setIsPendingQueueOpen] = useState(false);
+  const [pendingQueueOpenOverride, setPendingQueueOpenOverride] = useState(null);
+  const isPendingQueueOpen = pendingQueueOpenOverride ?? isAdmin;
   const [pendingCategorySupports, setPendingCategorySupports] = useState(() => readStorage(CACHE_KEYS.pendingCategorySupports, {}));
   const [searchQuery, setSearchQuery] = useState('');
   const [onlyShowFavorites, setOnlyShowFavorites] = useState(() => readStorage(CACHE_KEYS.favoritesSwitch, false));
@@ -42,8 +45,18 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchCategories().catch((err) => showToast(`${t('loadCategoriesError')}: ${err.message}`, 'error'));
-    fetchPendingCategoryQueue().catch(() => {});
-  }, [fetchCategories, fetchPendingCategoryQueue, showToast, t]);
+  }, [fetchCategories, showToast, t]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    fetchPendingCategoryQueue(isAdmin).catch((error) => showToast(error.message, 'error'));
+  }, [authLoading, fetchPendingCategoryQueue, isAdmin, showToast]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    fetchBannedUsers()
+      .catch((error) => showToast(error.message, 'error'));
+  }, [isAdmin, fetchBannedUsers, showToast]);
 
   const handleToggleSwitch = () => {
     const nextState = !onlyShowFavorites;
@@ -76,6 +89,7 @@ export default function HomePage() {
   };
   const handleSaveCategory = async (e) => {
     e.preventDefault();
+    if (!editingCat && !userName) return showToast(t('categoryGoogleLoginRequired'), 'error');
 
     const nameCheck = validateCategoryName(catForm.name);
     if (!nameCheck.valid) return showToast(nameCheck.error, 'error');
@@ -94,7 +108,7 @@ export default function HomePage() {
         await updateCategory(editingCat.id, payload);
         showToast(t('updateSuccess'));
       } else {
-        await submitPendingCategoryRequest(payload);
+        await submitPendingCategoryRequest(payload, isAdmin);
         showToast(t('pendingCategorySubmitSuccess'));
       }
 
@@ -106,16 +120,7 @@ export default function HomePage() {
 
   const handleApprovePendingCategory = async (item) => {
     try {
-      await approvePendingCategoryRequest(item.id, {
-        name: item.name,
-        showSecretKey: item.showSecretKey,
-        keepLetters: item.keepLetters,
-        keepNumbers: item.keepNumbers,
-        keepSymbols: item.keepSymbols,
-        forceUppercase: item.forceUppercase,
-        keepChinese: item.keepChinese,
-        webUrl: item.webUrl,
-      });
+      await approvePendingCategoryRequest(item.id, isAdmin);
       showToast(t('pendingCategoryApproved'));
     } catch (err) {
       showToast(err.message, 'error');
@@ -124,7 +129,7 @@ export default function HomePage() {
 
   const handleRejectPendingCategory = async (itemId) => {
     try {
-      await rejectPendingCategoryRequest(itemId);
+      await rejectPendingCategoryRequest(itemId, isAdmin);
       showToast(t('pendingCategoryRejected'));
     } catch (err) {
       showToast(err.message, 'error');
@@ -134,13 +139,26 @@ export default function HomePage() {
   const handleSupportPendingCategory = async (item) => {
     if (pendingCategorySupports[item.id]) return;
     try {
-      await supportPendingCategoryRequest(item.id);
+      await supportPendingCategoryRequest(item.id, isAdmin);
       const nextSupports = { ...pendingCategorySupports, [item.id]: true };
       setPendingCategorySupports(nextSupports);
       writeStorage(CACHE_KEYS.pendingCategorySupports, nextSupports);
       showToast(t('pendingCategorySupported'));
     } catch (err) {
       showToast(err.message, 'error');
+    }
+  };
+
+  const handleBanPendingSubmitter = async (item) => {
+    const normalizedEmail = String(item.submittedByEmail || '').trim().toLowerCase();
+    const confirmation = `${t('banUserConfirm')}【${normalizedEmail}】？`;
+    if (!normalizedEmail || !confirmAction(confirmation)) return;
+    try {
+      await banUserEmail(normalizedEmail);
+      await rejectPendingCategoryRequest(item.id, isAdmin);
+      showToast(`${t('banUserSuccess').replace('{name}', normalizedEmail)} ${t('pendingCategoryRejected')}`);
+    } catch (error) {
+      showToast(error.message, 'error');
     }
   };
 
@@ -181,7 +199,7 @@ export default function HomePage() {
             }}
             className="rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[9px] font-black text-blue-600 shadow-sm transition hover:bg-blue-100"
           >
-            {isCreateCardOpen ? '收起' : t('createCard')}
+            {isCreateCardOpen ? t('closeCreateCard') : t('createCard')}
           </button>
           <label className="flex items-center gap-1.5 cursor-pointer select-none ml-auto">
             <span className={`text-[9px] font-black ${onlyShowFavorites ? 'text-blue-600' : 'text-slate-400'}`}>{onlyShowFavorites ? t('favorites') : t('all')}</span>
@@ -194,7 +212,9 @@ export default function HomePage() {
 
         {isCreateCardOpen && (
           <div className="bg-slate-50/60 p-4 rounded-xl border border-slate-200/50 pl-5 space-y-4">
-            <h4 className="font-black text-blue-600 text-xs uppercase">{editingCat ? t('adminEditTitle') : t('adminCreateTitle')}</h4>
+            {!editingCat && !userName ? (
+              <div className="text-center rounded-xl bg-slate-50 p-4 text-[10px] font-bold italic text-slate-400">{t('categoryGoogleLoginRequired')}</div>
+            ) : (
             <form onSubmit={handleSaveCategory} className="space-y-3.5">
               <input type="text" className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 shadow-inner" placeholder={t('categoryNamePlaceholder')} value={catForm.name} onChange={e => setCatForm({ ...catForm, name: e.target.value })} />
               <input type="text" className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-mono shadow-inner" placeholder={t('webUrlPlaceholder')} value={catForm.webUrl} onChange={e => setCatForm({ ...catForm, webUrl: e.target.value })} />
@@ -211,6 +231,7 @@ export default function HomePage() {
               </div>
               <button type="submit" className="w-full py-2.5 bg-blue-600 text-white font-bold rounded-xl text-xs hover:bg-blue-500 transition-all">{t('createCard')}</button>
             </form>
+            )}
           </div>
         )}
 
@@ -222,7 +243,7 @@ export default function HomePage() {
                 <span className="text-[9px] font-bold text-amber-700">{pendingCategoryQueue.length}</span>
                 <button
                   type="button"
-                  onClick={() => setIsPendingQueueOpen((prev) => !prev)}
+                  onClick={() => setPendingQueueOpenOverride((open) => !(open ?? isAdmin))}
                   className="rounded-lg border border-amber-200 bg-white px-1.5 py-1 text-[8px] font-black text-amber-700"
                 >
                   {isPendingQueueOpen ? t('pendingCategoryCollapse') : t('pendingCategoryExpand')}
@@ -236,14 +257,38 @@ export default function HomePage() {
                   <div key={item.id} className="rounded-xl border border-amber-200 bg-white p-2.5">
                     <div className="mb-1 flex items-center justify-between gap-2">
                       <span className="text-xs font-black text-slate-800">{item.name}</span>
-                      <span className="text-[9px] font-bold text-slate-400">{formatLocalDateTime(item.createdAt)}</span>
+                      <span className="text-[9px] font-bold text-slate-400">{formatLocalDateTime(item.createdAt, locale)}</span>
                     </div>
                     {item.webUrl && <p className="mb-2 break-all text-[10px] text-slate-500">{item.webUrl}</p>}
+                    {!isAdmin && item.submittedByName && (
+                      <p className="mb-2 break-all text-[10px] text-slate-500">
+                        {t('submitterNameLabel')} <span className="font-semibold text-slate-700">{item.submittedByName}</span>
+                      </p>
+                    )}
+                    {isAdmin && item.submittedByEmail && (
+                      <div className="mb-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                        <p className="min-w-0 flex-1 break-all text-[10px] text-slate-500">
+                          {item.submittedByName && <span className="font-semibold text-slate-700">{item.submittedByName}</span>}
+                          {item.submittedByName && <span className="px-1 text-slate-400">·</span>}
+                          <span className="select-all font-mono font-bold text-slate-700">{item.submittedByEmail}</span>
+                        </p>
+                        <button
+                          type="button"
+                          aria-label={bannedEmails.some((email) => email.trim().toLowerCase() === item.submittedByEmail.trim().toLowerCase()) ? t('publisherBanned') : t('adminBanUser')}
+                          title={bannedEmails.some((email) => email.trim().toLowerCase() === item.submittedByEmail.trim().toLowerCase()) ? t('publisherBanned') : t('adminBanUser')}
+                          disabled={bannedEmails.some((email) => email.trim().toLowerCase() === item.submittedByEmail.trim().toLowerCase())}
+                          onClick={() => handleBanPendingSubmitter(item)}
+                          className="grid size-8 shrink-0 place-items-center rounded-lg border border-rose-200 bg-white text-sm text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                        >
+                          <span aria-hidden="true">🚫</span>
+                        </button>
+                      </div>
+                    )}
                     <div className="mb-2 flex flex-wrap gap-1 text-[9px] text-slate-500">
                       {item.keepLetters && <span className="rounded-full bg-slate-100 px-1.5 py-0.5">A-Z</span>}
                       {item.keepNumbers && <span className="rounded-full bg-slate-100 px-1.5 py-0.5">0-9</span>}
-                      {item.keepSymbols && <span className="rounded-full bg-slate-100 px-1.5 py-0.5">符號</span>}
-                      {item.keepChinese && <span className="rounded-full bg-slate-100 px-1.5 py-0.5">中文</span>}
+                      {item.keepSymbols && <span className="rounded-full bg-slate-100 px-1.5 py-0.5">{t('symbols')}</span>}
+                      {item.keepChinese && <span className="rounded-full bg-slate-100 px-1.5 py-0.5">{t('chinese')}</span>}
                     </div>
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <span className="text-[10px] font-bold text-amber-700">{t('pendingCategorySupportCount').replace('{count}', item.supportCount)}</span>

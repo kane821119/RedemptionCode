@@ -32,7 +32,7 @@ export const readStorage = (key, fallback = null) => {
   try {
     const parsedValue = JSON.parse(rawValue);
     return parsedValue ?? fallback;
-  } catch (error) {
+  } catch {
     return fallback;
   }
 };
@@ -41,12 +41,19 @@ export const writeStorage = (key, value) => {
   localStorage.setItem(key, JSON.stringify(value));
 };
 
-export const formatLocalDateTime = (value) => {
+export const formatLocalDateTime = (value, locale = Intl.DateTimeFormat().resolvedOptions().locale) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
 
-  const pad = (part) => String(part).padStart(2, '0');
-  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  return new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).format(date);
 };
 
 export const safeJsonParse = (value, fallback = {}) => {
@@ -56,7 +63,7 @@ export const safeJsonParse = (value, fallback = {}) => {
 
   try {
     return JSON.parse(value) ?? fallback;
-  } catch (error) {
+  } catch {
     return fallback;
   }
 };

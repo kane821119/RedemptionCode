@@ -4,7 +4,7 @@ import { translations, defaultLocale } from './translations';
 const STORAGE_KEY = 'app_locale';
 const MANUAL_OVERRIDE_KEY = 'app_locale_override';
 
-const createTranslator = (locale) => (key) => translations[locale]?.[key] || translations[defaultLocale]?.[key] || key;
+const createTranslator = (locale) => (key) => translations[locale]?.[key] || translations['en-US']?.[key] || translations[defaultLocale]?.[key] || key;
 
 const detectBrowserLanguage = () => {
   const browserLang = (navigator.language || navigator.userLanguage || defaultLocale).toLowerCase();
@@ -54,10 +54,10 @@ const resolveLocale = () => {
 };
 
 export const getLocaleText = (key, locale = resolveLocale()) => {
-  return translations[locale]?.[key] || translations[defaultLocale]?.[key] || key;
+  return translations[locale]?.[key] || translations['en-US']?.[key] || translations[defaultLocale]?.[key] || key;
 };
 
-export const useLanguageStore = create((set, get) => {
+export const useLanguageStore = create((set) => {
   const initialLocale = resolveLocale();
 
   return {

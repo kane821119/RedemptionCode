@@ -17,7 +17,7 @@ export const copyTextToClipboard = async (text) => {
     document.execCommand('copy');
     document.body.removeChild(textarea);
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 };

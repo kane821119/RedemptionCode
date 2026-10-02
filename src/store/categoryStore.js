@@ -1,11 +1,33 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabaseClient';
+import { getLocaleText } from '../i18n/languageStore';
 
 const isMissingTableError = (error) => {
   const message = String(error?.message || '').toLowerCase();
   return message.includes('could not find the table') ||
-    (message.includes('relation') && message.includes('does not exist')) ||
-    message.includes('schema cache');
+    (message.includes('relation') && message.includes('does not exist'));
+};
+
+const isMissingFunctionError = (error, functionName) => {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes(functionName.toLowerCase()) && (
+    message.includes('could not find the function') ||
+    message.includes('does not exist') ||
+    message.includes('schema cache')
+  );
+};
+
+const deletePendingCategoryRequest = async (requestId) => {
+  const { error } = await supabase.rpc('api_delete_pending_category_request', {
+    p_request_id: requestId,
+  });
+
+  if (error) {
+    if (isMissingFunctionError(error, 'api_delete_pending_category_request')) {
+      throw new Error(getLocaleText('missingAdminDeletePendingMigration'), { cause: error });
+    }
+    throw error;
+  }
 };
 
 export const useCategoryStore = create((set, get) => ({
@@ -14,25 +36,13 @@ export const useCategoryStore = create((set, get) => ({
   pendingCategoryQueue: [],
 
   fetchCategories: async () => {
-    const { data, error } = await supabase.from('categories').select('*').order('name');
+    const { data, error } = await supabase
+      .from('categories')
+      .select('id, name, show_secret_key, keep_letters, keep_numbers, keep_symbols, force_uppercase, keep_chinese, web_url, total_clicks')
+      .order('name');
     if (error) throw error;
+
     set({ categories: data || [] });
-  },
-
-  createCategory: async (payload) => {
-    const { error } = await supabase.rpc('api_create_category', {
-      p_name: payload.name,
-      p_show_secret: payload.showSecretKey,
-      p_keep_letters: payload.keepLetters,
-      p_keep_numbers: payload.keepNumbers,
-      p_keep_symbols: payload.keepSymbols,
-      p_force_upper: payload.forceUppercase,
-      p_keep_chinese: payload.keepChinese,
-      p_web_url: payload.webUrl,
-    });
-
-    if (error) throw error;
-    await get().fetchCategories();
   },
 
   updateCategory: async (id, payload) => {
@@ -58,159 +68,110 @@ export const useCategoryStore = create((set, get) => ({
     await get().fetchCategories();
   },
 
-  fetchPendingCategoryQueue: async () => {
-    try {
-      const { data, error } = await supabase
-        .from('pending_category_requests')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+  fetchPendingCategoryQueue: async (includeSubmitterInfo = false) => {
+    const { data, error } = await supabase.rpc('api_get_pending_category_queue', {
+      p_include_admin_info: includeSubmitterInfo,
+    });
 
-      if (error) {
-        if (isMissingTableError(error)) {
-          set({ pendingCategoryQueue: [] });
-          return [];
-        }
-        throw error;
+    if (error) {
+      if (isMissingFunctionError(error, 'api_get_pending_category_queue')) {
+        throw new Error(getLocaleText('missingPendingCategoryRpcMigration'), { cause: error });
       }
-
-      const queue = (data || []).map((item) => ({
-        id: item.id,
-        name: item.name,
-        showSecretKey: item.show_secret_key ?? false,
-        keepLetters: item.keep_letters ?? true,
-        keepNumbers: item.keep_numbers ?? true,
-        keepSymbols: item.keep_symbols ?? false,
-        forceUppercase: item.force_uppercase ?? true,
-        keepChinese: item.keep_chinese ?? false,
-        webUrl: item.web_url ?? '',
-        submittedBy: item.submitted_by ?? 'user',
-        createdAt: item.created_at ?? new Date().toISOString(),
-        supportCount: item.support_count ?? 0,
-      }));
-
-      set({ pendingCategoryQueue: queue });
-      return queue;
-    } catch (error) {
       if (isMissingTableError(error)) {
         set({ pendingCategoryQueue: [] });
         return [];
       }
       throw error;
     }
+
+    const queue = (data || []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      showSecretKey: item.show_secret_key ?? false,
+      keepLetters: item.keep_letters ?? true,
+      keepNumbers: item.keep_numbers ?? true,
+      keepSymbols: item.keep_symbols ?? false,
+      forceUppercase: item.force_uppercase ?? true,
+      keepChinese: item.keep_chinese ?? false,
+      webUrl: item.web_url ?? '',
+      submittedBy: item.submitted_by ?? 'user',
+      submittedByName: item.submitted_by_name ?? null,
+      submittedByUserId: item.submitted_by_user_id ?? null,
+      submittedByEmail: item.submitted_by_email ?? null,
+      createdAt: item.created_at ?? new Date().toISOString(),
+      supportCount: item.support_count ?? 0,
+    }));
+
+    set({ pendingCategoryQueue: queue });
+    return queue;
   },
 
-  supportPendingCategoryRequest: async (requestId) => {
+  supportPendingCategoryRequest: async (requestId, includeSubmitterInfo = false) => {
     const { data, error } = await supabase.rpc('api_support_pending_category_request', {
       p_request_id: requestId,
     });
     if (error) throw error;
-    await get().fetchPendingCategoryQueue();
+    await get().fetchPendingCategoryQueue(includeSubmitterInfo);
     return data;
   },
 
-  submitPendingCategoryRequest: async (payload) => {
-    const insertPayload = {
-      name: payload.name,
-      show_secret_key: payload.showSecretKey,
-      keep_letters: payload.keepLetters,
-      keep_numbers: payload.keepNumbers,
-      keep_symbols: payload.keepSymbols,
-      force_uppercase: payload.forceUppercase,
-      keep_chinese: payload.keepChinese,
-      web_url: payload.webUrl,
-      status: 'pending',
-      submitted_by: 'user',
-    };
-
+  submitPendingCategoryRequest: async (payload, includeSubmitterInfo = false) => {
     try {
-      const { data, error } = await supabase
-        .from('pending_category_requests')
-        .insert(insertPayload)
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc('api_submit_pending_category_request', {
+        p_name: payload.name,
+        p_web_url: payload.webUrl,
+        p_show_secret_key: payload.showSecretKey,
+        p_keep_letters: payload.keepLetters,
+        p_keep_numbers: payload.keepNumbers,
+        p_keep_symbols: payload.keepSymbols,
+        p_force_uppercase: payload.forceUppercase,
+        p_keep_chinese: payload.keepChinese,
+      });
 
       if (error) {
         if (isMissingTableError(error)) {
-          throw new Error('資料表 pending_category_requests 尚未建立，請先在 Supabase 建立這張表。');
+          throw new Error(getLocaleText('pendingCategoryTableMissing'));
         }
         throw error;
       }
 
-      await get().fetchPendingCategoryQueue();
+      await get().fetchPendingCategoryQueue(includeSubmitterInfo);
       return data;
     } catch (error) {
       if (isMissingTableError(error)) {
-        throw new Error('資料表 pending_category_requests 尚未建立，請先在 Supabase 建立這張表。');
+        throw new Error(getLocaleText('pendingCategoryTableMissing'), { cause: error });
       }
       throw error;
     }
   },
 
-  approvePendingCategoryRequest: async (requestId, payload) => {
-    const { data: userData } = await supabase.auth.getUser();
-    const reviewerId = userData?.user?.id ?? null;
+  approvePendingCategoryRequest: async (requestId, includeSubmitterInfo = false) => {
+    const { data, error } = await supabase.rpc('api_approve_pending_category_request', {
+      p_request_id: requestId,
+    });
+    if (error) throw error;
 
-    await get().createCategory(payload);
-
-    try {
-      const { error } = await supabase
-        .from('pending_category_requests')
-        .update({
-          status: 'approved',
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: reviewerId,
-        })
-        .eq('id', requestId);
-
-      if (error) {
-        if (isMissingTableError(error)) {
-          throw new Error('資料表 pending_category_requests 尚未建立，請先在 Supabase 建立這張表。');
-        }
-        throw error;
-      }
-
-      await get().fetchPendingCategoryQueue();
-    } catch (error) {
-      if (isMissingTableError(error)) {
-        throw new Error('資料表 pending_category_requests 尚未建立，請先在 Supabase 建立這張表。');
-      }
-      throw error;
-    }
+    set((state) => ({
+      pendingCategoryQueue: state.pendingCategoryQueue.filter((item) => item.id !== requestId),
+    }));
+    await get().fetchCategories();
+    await get().fetchPendingCategoryQueue(includeSubmitterInfo).catch(() => {});
+    return data;
   },
 
-  rejectPendingCategoryRequest: async (requestId) => {
-    const { data: userData } = await supabase.auth.getUser();
-    const reviewerId = userData?.user?.id ?? null;
-
-    try {
-      const { error } = await supabase
-        .from('pending_category_requests')
-        .update({
-          status: 'rejected',
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: reviewerId,
-        })
-        .eq('id', requestId);
-
-      if (error) {
-        if (isMissingTableError(error)) {
-          throw new Error('資料表 pending_category_requests 尚未建立，請先在 Supabase 建立這張表。');
-        }
-        throw error;
-      }
-
-      await get().fetchPendingCategoryQueue();
-    } catch (error) {
-      if (isMissingTableError(error)) {
-        throw new Error('資料表 pending_category_requests 尚未建立，請先在 Supabase 建立這張表。');
-      }
-      throw error;
-    }
+  rejectPendingCategoryRequest: async (requestId, includeSubmitterInfo = false) => {
+    await deletePendingCategoryRequest(requestId);
+    set((state) => ({
+      pendingCategoryQueue: state.pendingCategoryQueue.filter((item) => item.id !== requestId),
+    }));
+    await get().fetchPendingCategoryQueue(includeSubmitterInfo).catch(() => {});
   },
 
   fetchAnnouncements: async () => {
-    const { data, error } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('id, content, created_at')
+      .order('created_at', { ascending: false });
     if (error) throw error;
     set({ announcements: data || [] });
   },

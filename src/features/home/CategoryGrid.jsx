@@ -1,4 +1,3 @@
-import React from 'react';
 import { useLanguageStore } from '../../i18n/languageStore';
 
 export default function CategoryGrid({

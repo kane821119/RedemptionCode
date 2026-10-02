@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
 import { useChatStore } from '../store/chatStore';
 import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
@@ -9,22 +8,22 @@ import { useLanguageStore } from '../i18n/languageStore';
 import { formatLocalDateTime } from '../lib/storage';
 
 export default function LobbyChatPage() {
-  const navigate = useNavigate();
-  const { messages, bannedEmails, fetchMessages, fetchBannedUsers, createMessage, banUserEmail, removeBanUserEmail, deleteMessage } = useChatStore();
+  const { messages, bannedEmails, fetchMessages, fetchBannedUsers, createMessage, banUserEmail, deleteMessage } = useChatStore();
   const showToast = useToastStore((state) => state.showToast);
   const { userName, isAdmin, user: currentUser } = useAuthStore();
+  const locale = useLanguageStore((state) => state.locale);
   const t = useLanguageStore((state) => state.t);
   const [msgInput, setMsgInput] = useState('');
-  const [isBannedPanelOpen, setIsBannedPanelOpen] = useState(false);
 
   useEffect(() => {
     fetchMessages().catch(() => {});
     fetchBannedUsers().catch(() => {}); 
-  }, []);
+  }, [fetchBannedUsers, fetchMessages]);
 
   const isCurrentUserBanned = useMemo(() => {
     if (!currentUser || !currentUser.email) return false;
-    return bannedEmails.includes(currentUser.email);
+    const currentEmail = currentUser.email.trim().toLowerCase();
+    return bannedEmails.some((email) => email.trim().toLowerCase() === currentEmail);
   }, [bannedEmails, currentUser]);
 
   const handleSendMessage = async (e) => {
@@ -51,14 +50,6 @@ export default function LobbyChatPage() {
     }
   };
 
-  const handleUnbanUser = async (email) => {
-    if (confirmAction(`${t('unbanUserConfirm')} (${email})？`)) {
-      try {
-        await removeBanUserEmail(email);
-        showToast(t('unbanUserSuccess'));
-      } catch (err) { showToast(err.message, 'error'); }
-    }
-  };
   return (
     <div className="max-w-md mx-auto px-4 py-6 pb-24 bg-slate-50 min-h-screen font-sans selection:bg-blue-500 selection:text-white">
       {/* 留言發布卡片 */}
@@ -88,56 +79,6 @@ export default function LobbyChatPage() {
           </div>
         )}
       </div>
-
-      {/* ✨ 核心位置調整：僅限管理者可見、可展開/收合的置頂「黑名單特赦管理卡片」 */}
-      {isAdmin && (
-        <div className="mb-4">
-          <button 
-            onClick={() => setIsBannedPanelOpen(!isBannedPanelOpen)} 
-            className="w-full bg-white text-slate-800 p-3.5 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.015)] flex justify-between items-center active:scale-[0.99] transition-all border border-slate-200/80 relative overflow-hidden group"
-          >
-            {/* 左側對齊的琥珀色黑名單提示條 */}
-            <div className="absolute top-0 left-0 bottom-0 w-1 bg-amber-500 opacity-60"></div>
-            
-            <span className="text-xs font-black text-slate-700 tracking-wider flex items-center gap-2 pl-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-              {isBannedPanelOpen ? t('adminManageToggleClose') : t('adminManageToggleOpen')}
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] bg-amber-50 text-amber-700 font-extrabold px-1.5 py-0.5 rounded border border-amber-200/40">
-                {t('bannedUsersCount').replace('{count}', bannedEmails.length)}
-              </span>
-              <span className="text-xs text-slate-400 font-bold">{isBannedPanelOpen ? '▲' : '▼'}</span>
-            </div>
-          </button>
-
-          {isBannedPanelOpen && (
-            <section className="bg-white border border-slate-200/80 rounded-2xl p-4 mt-2 shadow-[0_4px_20px_rgba(0,0,0,0.02)] space-y-3 animate-fadeIn relative overflow-hidden">
-              <div className="absolute top-0 left-0 bottom-0 w-1 bg-amber-500 opacity-30"></div>
-              
-              <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-0.5 pl-1">
-                {bannedEmails.length === 0 ? (
-                  <div className="text-center py-4 text-[10px] font-bold text-slate-400 italic">{t('noBannedUsers')}</div>
-                ) : (
-                  bannedEmails.map((bannedEmail, index) => (
-                    <div key={index} className="flex justify-between items-center p-2 bg-slate-50 border border-slate-200/50 rounded-xl gap-3">
-                      <span className="text-[11px] font-mono font-bold text-slate-600 truncate flex-1 select-all">
-                        {bannedEmail}
-                      </span>
-                      <button 
-                        onClick={() => handleUnbanUser(bannedEmail)}
-                        className="text-[9px] font-black bg-white hover:bg-emerald-50 text-emerald-600 border border-slate-200 hover:border-emerald-200 px-2 py-1 rounded-lg shadow-sm transition active:scale-95 shrink-0"
-                      >
-                        {t('unblock')}
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
-          )}
-        </div>
-      )}
 
       {/* 留言歷史訊息串流 */}
       <div className="space-y-3">
@@ -172,7 +113,7 @@ export default function LobbyChatPage() {
                     )}
                   </div>
                   
-                  <span className="text-[9px] text-slate-400 font-bold">{formatLocalDateTime(msg.created_at)}</span>
+                  <span className="text-[9px] text-slate-400 font-bold">{formatLocalDateTime(msg.created_at, locale)}</span>
                 </div>
                 
                 <p className="text-xs text-slate-600 font-medium leading-relaxed break-all pr-20 pl-1">{msg.content}</p>

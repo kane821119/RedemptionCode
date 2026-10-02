@@ -7,13 +7,16 @@ export const useChatStore = create((set, get) => ({
   bannedEmails: [],
 
   fetchMessages: async () => {
-    const { data, error } = await supabase.from('messages').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id, user_id, user_name, user_email, content, created_at')
+      .order('created_at', { ascending: false });
     if (error) throw error;
     set({ messages: data || [] });
   },
 
   fetchBannedUsers: async () => {
-    const { data, error } = await supabase.from('banned_users').select('email');
+    const { data, error } = await supabase.from('banned_users').select('email').not('email', 'is', null);
     if (error) throw error;
     set({ bannedEmails: (data || []).map((item) => item.email) });
   },
@@ -29,7 +32,12 @@ export const useChatStore = create((set, get) => ({
       content: content.trim(),
     });
 
-    if (error) throw error;
+    if (error) {
+      if (String(error.message || '').includes('LOBBY_ACCOUNT_BANNED')) {
+        throw new Error(getLocaleText('bannedUserMessage'));
+      }
+      throw error;
+    }
     await get().fetchMessages();
   },
 

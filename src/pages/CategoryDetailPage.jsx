@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCategoryStore } from '../store/categoryStore';
 import { useCodePoolStore } from '../store/codePoolStore';
 import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
 import BulkUploadForm from '../features/pool/BulkUploadForm';
-import { supabase } from '../services/supabaseClient';
 import { CACHE_KEYS, readStorage, resolveReportThreshold, writeStorage, formatLocalDateTime } from '../lib/storage';
 import { resolveCategoryIdFromRoute } from '../lib/publicIds';
 import { copyTextToClipboard, confirmAction } from '../lib/browser';
@@ -13,18 +12,31 @@ import { useLanguageStore } from '../i18n/languageStore';
 import { translations } from '../i18n/translations';
 import SeoMeta from '../components/SeoMeta';
 
+const anonymousGuestNames = new Set(
+  Object.values(translations)
+    .map((localeMap) => localeMap.anonymousGuest)
+    .filter(Boolean)
+);
+
+const isAnonymousContributor = (value = '') => {
+  const trimmed = String(value || '').trim();
+  return !trimmed || anonymousGuestNames.has(trimmed);
+};
+
 export default function CategoryDetailPage() {
   const { routeKey } = useParams();
   const navigate = useNavigate();
   const { categories, fetchCategories } = useCategoryStore();
-  const { fetchCodesOfCategory, batchSubmitChanges, saveToLocalCache } = useCodePoolStore();
+  const { fetchCodesOfCategory, fetchCodePublisherCounts, batchSubmitChanges, deleteCode, banCodePublisher } = useCodePoolStore();
   const isAdmin = useAuthStore((state) => state.isAdmin);
   const showToast = useToastStore((state) => state.showToast);
+  const locale = useLanguageStore((state) => state.locale);
   const t = useLanguageStore((state) => state.t);
   const categoryId = resolveCategoryIdFromRoute(routeKey, categories);
 
-  const [currentCategory, setCurrentCategory] = useState(null);
+  const currentCategory = categories.find((category) => category.id === categoryId) || null;
   const [rawCodes, setRawCodes] = useState([]);
+  const [publisherCodeCounts, setPublisherCodeCounts] = useState({});
   const [syncTrigger, setSyncTrigger] = useState(0);
   const [localActions, setLocalActions] = useState(() => readStorage(CACHE_KEYS.actionHistory, {}));
 
@@ -59,15 +71,8 @@ export default function CategoryDetailPage() {
   useEffect(() => {
     if (!categories.length) {
       fetchCategories().catch(() => {});
-      return;
     }
-
-    const cat = categories.find(c => c.id === categoryId);
-    setCurrentCategory(cat);
-
-    const storedThreshold = Number(readStorage(CACHE_KEYS.reportThreshold, 1));
-    setThreshold(resolveReportThreshold({ storedValue: storedThreshold, fallback: 1 }));
-  }, [categoryId, categories, fetchCategories]);
+  }, [categories.length, fetchCategories]);
 
   useEffect(() => {
     if (!routeKey) return;
@@ -77,17 +82,29 @@ export default function CategoryDetailPage() {
     }
   }, [categoryId, routeKey, categories, navigate]);
 
-  const loadPoolData = async () => {
-    try {
-      const res = await fetchCodesOfCategory();
-      const filtered = res.filter(c => c.category_id === categoryId);
-      setRawCodes(filtered);
-    } catch (err) { showToast(err.message, 'error'); }
-  };
+  useEffect(() => {
+    if (!isAdmin) return;
+    fetchCodePublisherCounts()
+      .then(setPublisherCodeCounts)
+      .catch((error) => showToast(error.message, 'error'));
+  }, [fetchCodePublisherCounts, isAdmin, showToast, syncTrigger]);
 
   useEffect(() => {
-    if (currentCategory) loadPoolData();
-  }, [currentCategory, syncTrigger]);
+    if (!currentCategory) return;
+
+    let isCurrent = true;
+    fetchCodesOfCategory(categoryId, isAdmin)
+      .then((codes) => {
+        if (isCurrent) setRawCodes(codes);
+      })
+      .catch((error) => {
+        if (isCurrent) showToast(error.message, 'error');
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [categoryId, currentCategory, fetchCodesOfCategory, isAdmin, showToast, syncTrigger]);
 
   const processedCodes = useMemo(() => {
     const committedCache = readStorage(CACHE_KEYS.usedCodes, {});
@@ -152,18 +169,6 @@ export default function CategoryDetailPage() {
     });
   };
 
-  const anonymousGuestNames = new Set(
-    Object.values(translations)
-      .map((localeMap) => localeMap.anonymousGuest)
-      .filter(Boolean)
-  );
-
-  const isAnonymousContributor = (value = '') => {
-    const trimmed = String(value || '').trim();
-    if (!trimmed) return true;
-    return anonymousGuestNames.has(trimmed);
-  };
-
   const getDisplayContributor = (value = '') => {
     const trimmed = String(value || '').trim();
     if (!trimmed || anonymousGuestNames.has(trimmed)) {
@@ -202,10 +207,22 @@ export default function CategoryDetailPage() {
   const handleDeleteCode = async (id, codeText) => {
     if (!confirmAction(`${t('deleteCodeConfirm')} 【${codeText}】`)) return;
     try {
-      const { error } = await supabase.from('codes').delete().eq('id', id);
-      if (error) throw error;
+      await deleteCode(id);
       showToast(t('deleteCodeSuccess'));
       setSyncTrigger(p => p + 1);
+    } catch (err) { showToast(err.message, 'error'); }
+  };
+
+  const handleBanPublisher = async (publisherId) => {
+    const submittedCount = publisherCodeCounts[publisherId] || 0;
+    const confirmMessage = t('banPublisherConfirm')
+      .replace('{id}', publisherId || '')
+      .replace('{count}', submittedCount);
+    if (!publisherId || !confirmAction(confirmMessage)) return;
+    try {
+      await banCodePublisher(publisherId, currentCategory.id);
+      showToast(t('banPublisherSuccess'));
+      setSyncTrigger((value) => value + 1);
     } catch (err) { showToast(err.message, 'error'); }
   };
 
@@ -259,8 +276,8 @@ export default function CategoryDetailPage() {
   if (!currentCategory) return (
     <div className="text-center py-10 text-slate-400 text-xs font-bold">
       <SeoMeta
-        title="分類載入中"
-        description="正在載入分類內容，請稍候。"
+        title={t('categoryLoadingTitle')}
+        description={t('categoryLoadingDescription')}
         path={routeKey ? `/category/${routeKey}` : '/'}
       />
       {t('categoryLoading')}
@@ -328,7 +345,7 @@ export default function CategoryDetailPage() {
               <div className="grid grid-cols-2 gap-y-1.5 text-[10px] text-slate-400 font-bold border-b border-slate-100 pb-2.5 mb-2.5 pl-1">
                 {currentCategory.show_secret_key && <div className="truncate">{t('keyLabel')} <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-mono font-black">{item.secret_key || t('none')}</span></div>}
                 <div className="truncate">{t('contributorLabel')} <span className="text-slate-600 font-extrabold">{getDisplayContributor(item.contributor)}</span></div>
-                 <div className="truncate">{t('createdLabel')} <span className="text-slate-600 font-medium">{formatLocalDateTime(item.created_at)}</span></div>
+                 <div className="truncate">{t('createdLabel')} <span className="text-slate-600 font-medium">{formatLocalDateTime(item.created_at, locale)}</span></div>
                  <div className={`truncate ${Number(item.claim_count || 0) > 0 ? 'text-blue-500' : ''}`}>
                    {t('claimCountLabel')} {Number(item.claim_count || 0)}
                  </div>
@@ -336,6 +353,22 @@ export default function CategoryDetailPage() {
                    {t('reportCountLabel')} {Number(item.report_count || 0)}
                  </div>
               </div>
+
+              {isAdmin && (
+                <div className="mb-2.5 pl-1 flex items-center gap-2 text-[10px] text-slate-400 font-bold">
+                  <div className="min-w-0 flex-1 break-all">
+                    {t('publisherIdLabel')} <span className="text-slate-600 font-mono font-extrabold">{item.publisher_id || t('publisherIdUnknown')}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleBanPublisher(item.publisher_id)}
+                    disabled={!item.publisher_id || item.publisher_banned}
+                    className="ml-auto shrink-0 rounded border border-rose-200 bg-rose-50 px-2 py-1 text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {item.publisher_banned ? t('publisherBanned') : t('banPublisherButton')}
+                  </button>
+                </div>
+              )}
 
               {item.note && (
                 <div className="mb-2.5 pl-1 text-[10px] text-slate-600 font-bold opacity-80">

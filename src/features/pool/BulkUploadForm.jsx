@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useCodePoolStore } from '../../store/codePoolStore';
 import { useToastStore } from '../../store/toastStore';
 import { useAuthStore } from '../../store/authStore';
-import { supabase } from '../../services/supabaseClient';
 import { extractCodes } from '../../lib/codeParser';
 import { validateBulkCodeInput, validateContributor, validateSingleCode } from '../../lib/validation';
 import { useLanguageStore } from '../../i18n/languageStore';
@@ -10,17 +9,16 @@ import { useLanguageStore } from '../../i18n/languageStore';
 export default function BulkUploadForm({ category, onUploaded }) {
   const [bulkInput, setBulkInput] = useState('');
   const [singleSecret, setSingleSecret] = useState('');
-  const [contributor, setContributor] = useState('');
+  const [contributorOverride, setContributorOverride] = useState(null);
   const [noteText, setNoteText] = useState('');
   
   const userName = useAuthStore((state) => state.userName);
+  const ensurePublisherSession = useAuthStore((state) => state.ensurePublisherSession);
   const { insertCodesBulk } = useCodePoolStore();
   const showToast = useToastStore((state) => state.showToast);
   const t = useLanguageStore((state) => state.t);
 
-  useEffect(() => {
-    if (userName) setContributor(userName);
-  }, [userName]);
+  const contributor = contributorOverride ?? userName ?? '';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,43 +38,30 @@ export default function BulkUploadForm({ category, onUploaded }) {
     }
 
     try {
-      // 2. 🛡️ 【前端去重攔截】直接向資料庫查詢該大類下已存在的序號
-      const { data: existingRecords, error: checkError } = await supabase
-        .from('codes')
-        .select('code')
-        .eq('category_id', category.id)
-        .in('code', rawMatches);
+      const normalizedNote = noteText.trim();
+      const notesArray = new Array(rawMatches.length).fill(normalizedNote || null);
 
-      if (checkError) throw checkError;
+      await ensurePublisherSession();
+      const insertedCount = await insertCodesBulk({
+        categoryId: category.id,
+        codesArray: rawMatches,
+        secretsArray: new Array(rawMatches.length).fill(singleSecretValue),
+        contributorName: contributorCheck.value,
+        notesArray
+      });
+      const skippedCount = rawMatches.length - insertedCount;
 
-      const existingCodes = new Set((existingRecords || []).map(r => r.code));
-      const uniqueNewCodes = rawMatches.filter(code => !existingCodes.has(code));
-      const skippedCount = rawMatches.length - uniqueNewCodes.length;
-
-      // 3. 分流處理查重彈窗提示
-      if (uniqueNewCodes.length === 0) {
+      if (insertedCount === 0) {
         showToast(t('bulkSkipDuplicate').replace('{count}', skippedCount), 'error');
         setBulkInput('');
         setSingleSecret('');
         return;
       }
 
-      // 4. 只將真正全新的乾淨序號送去後端上架
-      const normalizedNote = noteText.trim();
-      const notesArray = new Array(uniqueNewCodes.length).fill(normalizedNote || null);
-
-      await insertCodesBulk({
-        categoryId: category.id,
-        codesArray: uniqueNewCodes,
-        secretsArray: new Array(uniqueNewCodes.length).fill(singleSecretValue),
-        contributorName: contributorCheck.value,
-        notesArray
-      });
-
       if (skippedCount > 0) {
-        showToast(t('bulkInsertedWithSkip').replace('{count}', uniqueNewCodes.length).replace('{skipped}', skippedCount));
+        showToast(t('bulkInsertedWithSkip').replace('{count}', insertedCount).replace('{skipped}', skippedCount));
       } else {
-        showToast(t('bulkInserted').replace('{count}', uniqueNewCodes.length));
+        showToast(t('bulkInserted').replace('{count}', insertedCount));
       }
 
       setBulkInput('');
@@ -123,7 +108,7 @@ export default function BulkUploadForm({ category, onUploaded }) {
             className="w-full md:col-span-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-500 focus:outline-none text-slate-800 placeholder-slate-400"
             placeholder={t('contributorPlaceholder')}
             value={contributor}
-            onChange={e => setContributor(e.target.value)}
+            onChange={e => setContributorOverride(e.target.value)}
           />
         </div>
         
